@@ -1,6 +1,6 @@
 {
   "name": "foundation",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Setup, health checks and safe publishing for ivan-the-terminal: doctor, new-machine bootstrap, and a leak-guarded ship-public flow.",
   "author": {
     "name": "Ivan Zdravkov",

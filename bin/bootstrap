@@ -28,6 +28,10 @@ git -C "$ITT_HOME" config core.hooksPath .githooks
 say "itt on PATH (~/.local/bin)"
 link "$ITT_HOME/bin/itt" "$HOME/.local/bin/itt"
 
+say "shell: interactive claude starts in ivan-the-terminal (~/.bashrc.d)"
+link "$ITT_HOME/shell/claude-home.bash" "$HOME/.bashrc.d/claude-home.sh"
+grep -qs 'bashrc.d' "$HOME/.bashrc" || say "WARNING: ~/.bashrc doesn't source ~/.bashrc.d; add: for rc in ~/.bashrc.d/*; do . \"\$rc\"; done"
+
 say "skills -> ~/.claude/skills"
 for s in "$ITT_HOME"/plugins/*/skills/*/; do
   [ -f "$s/SKILL.md" ] && link "${s%/}" "$HOME/.claude/skills/$(basename "$s")"

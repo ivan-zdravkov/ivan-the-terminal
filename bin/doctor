@@ -56,6 +56,8 @@ if (cd "$ITT_HOME" && python3 -I tools/leakguard/leakguard.py tree 2>/dev/null);
 else r fail leak-scan "tracked files contain findings: itt guard tree"; fi
 
 # --- links
+[ "$(readlink -f "$HOME/.bashrc.d/claude-home.sh")" = "$ITT_HOME/shell/claude-home.bash" ] && r ok claude-home "" \
+  || r warn claude-home "interactive claude won't start in ivan-the-terminal: itt bootstrap"
 [ "$(readlink -f "$(command -v itt 2>/dev/null)")" = "$ITT_HOME/bin/itt" ] && r ok itt-path "" || r warn itt-path "itt not on PATH: itt bootstrap"
 for s in "$ITT_HOME"/plugins/*/skills/*/; do
   n=$(basename "$s")

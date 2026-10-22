@@ -13,6 +13,7 @@ Usage:
   leakguard.py [--redact] [--require-denylist] range BASE HEAD  # pre-push / CI (BASE=--root: all history)
   leakguard.py [--redact] [--require-denylist] tree             # all tracked files
   leakguard.py [--redact] [--require-denylist] text [FILE|-]    # messages, PR bodies
+  leakguard.py candidates BASE HEAD  # terms in added lines that *might* be personal (for review)
   leakguard.py claude-hook      # Claude Code PreToolUse hook (JSON on stdin)
 
 Exit codes: 0 clean, 1 findings, 2 blocked (claude-hook) or usage error.
@@ -27,6 +28,8 @@ import re
 import shlex
 import subprocess
 import sys
+import traceback
+import unicodedata
 from pathlib import Path
 
 
@@ -73,8 +76,32 @@ def _phone_ok(m):
     return not 8 <= sum(c.isdigit() for c in m.group(0)) <= 15
 
 
+def _luhn(digits):
+    total = sum(d if i % 2 == 0 else (d * 2 - 9 if d > 4 else d * 2) for i, d in enumerate(reversed(digits)))
+    return total % 10 == 0
+
+
+CARD_IIN = re.compile(r"4\d{12}(?:\d{3}){0,2}|(?:5[1-5]\d{2}|222[1-9]|22[3-9]\d|2[3-6]\d{2}|27[01]\d|2720)\d{12}"
+                      r"|3[47]\d{13}|6(?:011|5\d{2})\d{12,15}")
+
+
+def _luhn_ok(m):
+    """False positive unless the whole match is a real card: issuer prefix + length + Luhn."""
+    digits = re.sub(r"\D", "", m.group(0))
+    return not (CARD_IIN.fullmatch(digits) and _luhn([int(c) for c in digits]))
+
+
+def bank_view(line):
+    """Normalise copy-paste artefacts (NBSP, thin spaces, tabs, full-width digits, slashes) for the bank rules."""
+    return re.sub(r"[\s/,\u2013\u2014]+", " ", unicodedata.normalize("NFKC", line))
+
+
+def _account_ok(m):
+    return sum(c.isdigit() for c in m.group(0)) < 6
+
+
 def _iban_ok(m):
-    s = m.group(0).replace(" ", "")
+    s = re.sub(r"[ -]", "", m.group(0)).upper()
     s = s[4:] + s[:4]
     return int("".join(str(int(c, 36)) for c in s)) % 97 != 1
 
@@ -93,9 +120,18 @@ RULES = [  # (id, pattern, is_false_positive)
     ("private-key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), None),
     ("age-secret-key", re.compile(r"AGE-SECRET-KEY-1[0-9A-Z]{20,}"), None),
     ("coordinates", re.compile(r"(?<![\w.])-?\d{1,2}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}(?![\w.])"), None),
-    ("iban", re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,3})?\b"), _iban_ok),
+    ("iban", re.compile(r"(?i)\b[A-Z]{2} ?\d{2}(?:[ .-]?[A-Z0-9]{4}){3,7}(?:[ .-]?[A-Z0-9]{1,3})?\b"), _iban_ok),
+    # card layouts: 4-4-4-4(+), Amex 4-6-5, or contiguous; one consistent separator
+    ("payment-card", re.compile(r"(?<![\d.])(?:\d{4}([ -]?)\d{4}\1\d{4}\1\d{1,7}|\d{4}([ -]?)\d{6}\2\d{4,5}|\d{13,19})(?![\d.])"),
+     _luhn_ok),
+    ("bank-account", re.compile(
+        r"(?i)\b(?:(?:iban|sort[\s_-]*code|routing[\s_-]*(?:number|no)|aba|acct|kontonummer|bankkonto|сметка"
+        r"|account[\s_-]*(?:number|num|no))\b\.?|account\s*(?=[:=#]))[\"']?\s*(?:(?:[:=#-]|is)\s*){0,2}[\"']?"
+        r"(?-i:(?=[A-Z0-9 .-]*\d)[A-Z0-9][A-Z0-9 .-]{4,32}[A-Z0-9])"), _account_ok),
+    ("bic", re.compile(r"(?i)\b(?:bic|swift[\s_-]*code|swift)\s*[:=#]\s*(?-i:[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b"), None),
     ("wifi-secret", re.compile(r"(?i)\b(?:psk|wpa_passphrase|wifi_?pass(?:word)?)\s*[=:]\s*\S+"), None),
 ]
+HARD_RULES = {"payment-card", "iban", "bank-account", "bic", "private-key", "age-secret-key"}  # no allowlist, no inline allow
 TOKEN = re.compile(r"[^\s\"'`<>()\[\]{},;=]+")
 SUBTOKEN = re.compile(r"[:/@?&#.+|\\]")
 
@@ -159,13 +195,18 @@ class Guard:
                 for cand in {tok, tok.rstrip(".:!?"), *SUBTOKEN.split(tok)}:
                     if hashlib.sha256(cand.encode()).hexdigest() in self.deny_hash:
                         self._report(where, "denylist#sha256", cand)
-        if deny_only or INLINE_ALLOW in line or self._path_allowed(path):
+        if deny_only:
             return
+        allowed = INLINE_ALLOW in line or self._path_allowed(path)
+        banked = bank_view(line)
         for rule, rx, false_positive in RULES:
-            for m in rx.finditer(line):
+            hard = rule in HARD_RULES
+            if allowed and not hard:
+                continue
+            for m in rx.finditer(banked if hard else line):
                 if false_positive and false_positive(m):
                     continue
-                if any(a.fullmatch(m.group(0)) for a in self.allow_re):
+                if not hard and any(a.fullmatch(m.group(0)) for a in self.allow_re):
                     continue
                 self._report(where, rule, m.group(0))
 
@@ -278,12 +319,77 @@ def cmd_tree(g):
             g.scan_blob(path, (ROOT / path).read_bytes())
 
 
-def _inside_root(p):
+REVIEWED_FILE = ROOT / ".leakguard-reviewed"
+WORD = re.compile(r"(?<![\w@./-])[^\W\d_][^\W_]*(?:['-][^\W\d_]+)*")
+NUMBERISH = re.compile(r"\b\d{4,}\b|@[\w.-]{3,}")
+
+
+def cmd_candidates(g, base, head):
+    """List terms from a range that a human should classify: capitalised or all-caps words (any script) never seen
+    in lowercase in the base tree, long numbers and handles, from added lines, commit messages and file names.
+    Skips terms already in .leakguard-reviewed."""
+    rng = head if base == "--root" else f"{base}..{head}"
+    texts = [l[1:] for l in git("log", "-p", *DIFF, "--diff-merges=first-parent", "--format=", rng).splitlines()
+             if l.startswith("+") and not l.startswith("+++")]
+    texts += git("log", "--format=%B", rng).splitlines()
+    texts += git("log", "--format=", "--name-only", "--diff-merges=first-parent", rng).splitlines()
+    corpus = set()
+    if base != "--root":  # what the repo already says in lowercase is ordinary vocabulary
+        for path in git("ls-tree", "-r", "--name-only", base).splitlines():
+            if Path(path).suffix.lower() not in OPAQUE_EXT:
+                corpus.update(re.findall(r"\b[^\W\d_]+\b", git("show", f"{base}:{path}").lower()))
+    reviewed = set()
+    if REVIEWED_FILE.is_file():
+        reviewed = {l.strip().casefold() for l in REVIEWED_FILE.read_text().splitlines() if l.strip() and l[0] != "#"}
+    counts = {}
+    for line in texts:
+        terms = [w for w in WORD.findall(line) if w[0].isupper() and len(w) > 2] + NUMBERISH.findall(line)
+        for term in terms:
+            if term.casefold() in reviewed or term.lower() in corpus:
+                continue
+            counts[term] = counts.get(term, 0) + 1
+    for term, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+        print(f"{n}\t{term}")
+    return 0
+
+
+def _common_dir(d):
     try:
-        Path(p).resolve().relative_to(ROOT)
-        return True
-    except (ValueError, OSError):
-        return False
+        out = subprocess.run(["git", "-C", str(d), "rev-parse", "--path-format=absolute", "--git-common-dir",
+                              "--show-toplevel"], capture_output=True, text=True, check=True).stdout.split("\n")
+        return Path(out[0]).resolve(), Path(out[1]).resolve()
+    except (subprocess.CalledProcessError, FileNotFoundError, NotADirectoryError, IndexError):
+        return None, None
+
+
+def _checkout_of(p):
+    """Toplevel of the checkout (main or any worktree of this repo) that contains p, else None."""
+    path = Path(p).expanduser().resolve()
+    try:
+        path.relative_to(ROOT)
+        return ROOT
+    except ValueError:
+        pass
+    d = path if path.is_dir() else path.parent
+    while not d.exists() and d != d.parent:
+        d = d.parent
+    common, top = _common_dir(d)
+    if not common:
+        return None
+    if common == _common_dir(ROOT)[0] or _is_guarded_checkout(top):
+        return top
+    return None
+
+
+def _is_guarded_checkout(top):
+    """A separate clone of this repo: same guard script and the same Claude hook wiring."""
+    settings = top / ".claude" / "settings.json"
+    return (top / "tools" / "leakguard" / "leakguard.py").is_file() and settings.is_file() \
+        and "leakguard.py" in settings.read_text(errors="ignore")
+
+
+def _inside_root(p):
+    return _checkout_of(p) is not None
 
 
 PUBLISHING = re.compile(r"\bgh\s+(?:pr|issue|release|gist|api|repo)\b|\bgit\b[^|;&]*?\s(?:commit|tag|notes|push)\b")
@@ -296,10 +402,11 @@ def cmd_claude_hook(g):
     tool, ti = data.get("tool_name", ""), data.get("tool_input") or {}
     if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
         fp = ti.get("file_path") or ti.get("notebook_path") or ""
-        if not _inside_root(fp):
+        top = _checkout_of(fp) if fp else None
+        if top is None:
             return 0
-        rel = str(Path(fp).resolve().relative_to(ROOT))
-        if subprocess.run(["git", "check-ignore", "-q", rel], cwd=ROOT).returncode == 0:
+        rel = str(Path(fp).expanduser().resolve().relative_to(top))
+        if subprocess.run(["git", "check-ignore", "-q", rel], cwd=top).returncode == 0:
             return 0  # ignored files never reach the remote
         g.scan_line(f"{rel} (path)", rel, rel)
         parts = [ti.get("content"), ti.get("new_string"), ti.get("new_source")]
@@ -351,8 +458,15 @@ def main(argv):
         src = rest[0] if rest else "-"
         g.scan_text("text" if src == "-" else src,
                     sys.stdin.read() if src == "-" else Path(src).read_text(encoding="utf-8"))
+    elif cmd == "candidates" and len(rest) == 2:
+        return cmd_candidates(g, *rest)
     elif cmd == "claude-hook":
-        return cmd_claude_hook(g)
+        try:
+            return cmd_claude_hook(g)
+        except Exception:  # fail closed: a crashing guard must not let the write through
+            traceback.print_exc()
+            print("leakguard: hook error, blocking to be safe. Fix the hook or the input.", file=sys.stderr)
+            return 2
     else:
         print(__doc__, file=sys.stderr)
         return 2

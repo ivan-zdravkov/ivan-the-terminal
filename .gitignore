@@ -22,3 +22,6 @@ __pycache__/
 .DS_Store
 *.swp
 *~
+
+# Claude project MCP config may carry keys
+.mcp.json
