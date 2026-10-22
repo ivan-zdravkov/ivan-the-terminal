@@ -1,0 +1,9 @@
+# command   brew-formula   purpose
+git         git            version control
+gh          gh             GitHub CLI: repos, PRs, secrets
+jq          jq             JSON in shell scripts
+gitleaks    gitleaks       credential scanning (hooks + CI)
+sops        sops           encrypted secrets in the private overlay
+age         age            encryption backend for sops
+shellcheck  shellcheck     lint for bin/ and hooks
+python3     python@3.13    leakguard and helpers (stdlib only)

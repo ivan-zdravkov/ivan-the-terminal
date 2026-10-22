@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Commit messages are public too.
+set -euo pipefail
+ROOT=$(git rev-parse --show-toplevel)
+lg=(python3 -I "$ROOT/tools/leakguard/leakguard.py")
+[ "$(git config --bool leakguard.requireDenylist || true)" = true ] && lg+=(--require-denylist)
+grep -v '^#' "$1" | "${lg[@]}" text -

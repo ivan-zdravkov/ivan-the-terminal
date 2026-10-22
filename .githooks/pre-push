@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Last local gate: pushing a branch to a public remote publishes it, so scan every outgoing commit.
+set -euo pipefail
+ROOT=$(git rev-parse --show-toplevel)
+lg=(python3 -I "$ROOT/tools/leakguard/leakguard.py")
+[ "$(git config --bool leakguard.requireDenylist || true)" = true ] && lg+=(--require-denylist)
+zero=0000000000000000000000000000000000000000
+while read -r _ lsha rref rsha; do
+  [ "$lsha" = "$zero" ] && continue  # branch deletion
+  if [ "$rref" = refs/heads/main ] && [ "${ITT_ALLOW_MAIN_PUSH:-}" != 1 ]; then
+    echo "pre-push: main only changes through PRs (ship-public skill)" >&2; exit 1
+  fi
+  if [ "$rsha" = "$zero" ]; then base=$(git merge-base "$lsha" origin/main 2>/dev/null || echo --root); else base=$rsha; fi
+  "${lg[@]}" range "$base" "$lsha"
+done
+gitleaks git --redact --no-banner --log-level warn "$ROOT"

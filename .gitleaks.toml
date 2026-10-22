@@ -1,0 +1,4 @@
+title = "ivan-the-terminal"
+
+[extend]
+useDefault = true

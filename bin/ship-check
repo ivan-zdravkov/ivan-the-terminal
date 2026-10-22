@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Every gate a branch must pass before it is pushed to the public remote.
+set -euo pipefail
+ITT_HOME="${ITT_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
+cd "$ITT_HOME"
+lg=(python3 -I tools/leakguard/leakguard.py)
+[ "$(git config --bool leakguard.requireDenylist || true)" = true ] && lg+=(--require-denylist)
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "ship-check: uncommitted changes; commit or stash first" >&2; exit 1
+fi
+git fetch -q origin 2>/dev/null || true
+base=$(git merge-base HEAD origin/main 2>/dev/null || echo --root)
+
+"${lg[@]}" tree
+"${lg[@]}" range "$base" HEAD
+gitleaks git --redact --no-banner --log-level warn .
+python3 -I -m unittest discover -q -s tools/leakguard 2>&1 | tail -1
+python3 -I tools/lint_skills.py
+shellcheck -x bin/* .githooks/*
+if [ "$base" = --root ]; then n=$(git rev-list --count HEAD); else n=$(git rev-list --count "$base..HEAD"); fi
+echo "ship-check: clean ($n commit(s) checked)"

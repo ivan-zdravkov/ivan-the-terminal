@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2015  # `test && r ok || r fail` is safe: r() always succeeds
+# Health check for ivan-the-terminal. Prints problems only (-v: everything) and a summary line.
+#   --update   upgrade outdated brew-managed tools first
+set -uo pipefail
+ITT_HOME="${ITT_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
+PRIVATE_DIR="${ITT_PRIVATE_DIR:-$(dirname "$ITT_HOME")/ivan-the-terrible}"
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+verbose=0 update=0
+for a in "$@"; do case "$a" in -v) verbose=1 ;; --update) update=1 ;; esac; done
+
+out=()
+r() { out+=("$1"$'\t'"$2"$'\t'"$3"); }
+
+# --- toolchain: present and current
+export HOMEBREW_NO_AUTO_UPDATE=1
+if [ $update = 1 ]; then brew update -q >/dev/null 2>&1; fi
+outdated=$(brew outdated --quiet 2>/dev/null || true)
+while read -r cmd formula purpose; do
+  case "$cmd" in ''|'#'*) continue ;; esac
+  if ! command -v "$cmd" >/dev/null; then r fail "tool:$cmd" "missing ($purpose): itt bootstrap"; continue; fi
+  if grep -qx "${formula%%@*}\(@.*\)\?" <<<"$outdated"; then
+    if [ $update = 1 ] && brew upgrade -q "$formula" >/dev/null 2>&1; then r ok "tool:$cmd" "upgraded"
+    else r warn "tool:$cmd" "update available: itt doctor --update"; fi
+  else
+    r ok "tool:$cmd" "$("$cmd" --version 2>&1 | head -1)"
+  fi
+done < "$ITT_HOME/toolchain.txt"
+gh_path=$(command -v gh || true)
+if [ -n "$gh_path" ] && [[ "$gh_path" != /home/linuxbrew/* ]]; then  # not brew-managed: compare with latest release
+  have=$(gh --version | head -1 | awk '{print $3}')
+  latest=$(gh api repos/cli/cli/releases/latest -q .tag_name 2>/dev/null | tr -d v)
+  [ -n "$latest" ] && [ "$have" != "$latest" ] && r warn tool:gh-version "$have at $gh_path, latest $latest: brew install gh (then remove the old binary)"
+fi
+
+# --- auth
+if gh auth status >/dev/null 2>&1; then r ok gh-auth ""; else r fail gh-auth "gh auth login -p ssh"; fi
+key="$HOME/.ssh/id_ed25519"
+if [ -f "$key" ]; then
+  if ssh-keygen -y -P "" -f "$key" >/dev/null 2>&1; then r warn ssh-passphrase "$key has no passphrase: ssh-keygen -p -f $key"
+  else r ok ssh-passphrase ""; fi
+fi
+if ssh -o BatchMode=yes -o ConnectTimeout=5 -T git@github.com 2>&1 | grep -q "successfully authenticated"; then r ok github-ssh ""
+else r fail github-ssh "ssh -T git@github.com failed (agent unlocked? key on GitHub?)"; fi
+
+# --- guards
+[ "$(git -C "$ITT_HOME" config core.hooksPath)" = .githooks ] && r ok git-hooks "" || r fail git-hooks "itt bootstrap"
+for h in pre-commit commit-msg pre-push; do [ -x "$ITT_HOME/.githooks/$h" ] || r fail "hook:$h" "missing or not executable"; done
+jq -e '.hooks.PreToolUse[]?.hooks[]?.command | select(test("leakguard"))' "$ITT_HOME/.claude/settings.json" >/dev/null 2>&1 \
+  && r ok claude-hook "" || r fail claude-hook ".claude/settings.json lost its leakguard PreToolUse hook"
+if [ -s "$CFG/ivan-the-terminal/leakguard.denylist" ]; then r ok denylist ""
+else r warn denylist "no private denylist: generic rules only"; fi
+if (cd "$ITT_HOME" && python3 -I tools/leakguard/leakguard.py tree 2>/dev/null); then r ok leak-scan "tree clean"
+else r fail leak-scan "tracked files contain findings: itt guard tree"; fi
+
+# --- links
+[ "$(readlink -f "$(command -v itt 2>/dev/null)")" = "$ITT_HOME/bin/itt" ] && r ok itt-path "" || r warn itt-path "itt not on PATH: itt bootstrap"
+for s in "$ITT_HOME"/plugins/*/skills/*/; do
+  n=$(basename "$s")
+  [ "$(readlink -f "$HOME/.claude/skills/$n")" = "$(readlink -f "$s")" ] || r warn "skill:$n" "not linked: itt bootstrap"
+done
+
+# --- GitHub-side protection (skipped offline)
+slug=$(git -C "$ITT_HOME" remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')
+if [ -n "$slug" ]; then
+  checks=$(gh api "repos/$slug/branches/main/protection" -q '.required_status_checks.contexts | sort | join(",")' 2>/dev/null)
+  if [ "$checks" = "gitleaks,leakguard,tests" ]; then r ok branch-protection ""
+  elif [ -n "$checks" ]; then r warn branch-protection "required checks are '$checks'"
+  else r fail branch-protection "main is not protected on $slug"; fi
+  pp=$(gh api "repos/$slug" -q '.security_and_analysis.secret_scanning_push_protection.status' 2>/dev/null)
+  [ "$pp" = enabled ] && r ok push-protection "" || r warn push-protection "GitHub secret push protection is '${pp:-unknown}'"
+fi
+
+# --- private overlay
+if [ -x "$PRIVATE_DIR/bin/doctor" ]; then
+  while IFS=$'\t' read -r l c d; do r "$l" "private:$c" "$d"; done < <("$PRIVATE_DIR/bin/doctor")
+else
+  r warn private-overlay "not found at $PRIVATE_DIR (generic mode)"
+fi
+
+# --- report
+ok=0 warn=0 fail=0
+for line in "${out[@]}"; do
+  IFS=$'\t' read -r l c d <<<"$line"
+  case "$l" in ok) ok=$((ok+1)) ;; warn) warn=$((warn+1)) ;; fail) fail=$((fail+1)) ;; esac
+  if [ "$l" != ok ] || [ $verbose = 1 ]; then printf '%-4s %-26s %s\n' "$l" "$c" "$d"; fi
+done
+if [ $((warn+fail)) = 0 ]; then echo "doctor: all green ($ok checks)"; else echo "doctor: $ok ok, $warn warn, $fail fail"; fi
+[ $fail = 0 ]
