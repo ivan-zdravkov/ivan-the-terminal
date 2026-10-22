@@ -65,7 +65,7 @@ if [ $dry = 1 ]; then
 fi
 
 LOG="$LOGS/$(date +%F_%H%M).log"
-cd "$STATE" || exit 1
+cd "$WORK" || exit 1  # cwd = work dir: nothing else is in default read scope
 JOB_DIGEST_WORK="$WORK" "${cmd[@]}" <<<"$prompt" >"$LOG" 2>&1  # prompt on stdin: not visible in /proc/*/cmdline
 status=$?
 if [ $status -ne 0 ] && command -v notify-send >/dev/null; then notify-send "Job digest failed" "See $LOG"; fi
