@@ -81,6 +81,11 @@ jobs:
           persist-credentials: false
       - name: leakguard unit tests
         run: python3 -I -m unittest discover -v -s tools/leakguard
+      - name: Skill script tests
+        run: |
+          for d in plugins/*/skills/*/scripts; do
+            if compgen -G "$d/test_*.py" >/dev/null; then python3 -I -m unittest discover -v -s "$d"; fi
+          done
       - name: Skill and manifest lint
         run: python3 -I tools/lint_skills.py
       - name: Shell lint

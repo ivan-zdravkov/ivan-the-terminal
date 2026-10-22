@@ -1,0 +1,7 @@
+# ~/.config/ivan-the-terminal/retro.conf
+ROMS="/path/to/Emulation/roms"          # <system>/ folders, ES-DE layout
+PREFERRED_REGIONS="USA,World,Europe"     # 60 Hz first; Europe-only titles are flagged as 50 Hz
+# rom-sync targets
+TARGET_tablet="adb:/sdcard/Emulation/roms"
+TARGET_tablet_systems="nes snes gba psx"
+TARGET_sdcard="/run/media/<user>/<card>/roms"

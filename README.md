@@ -54,7 +54,8 @@ flowchart LR
 | [foundation](plugins/foundation) | `doctor`, `new-machine`, `ship-public`, `kaizen` | ✅ |
 | [homelab](plugins/homelab) | `homelab-check` (daily, notifies), `system-updates` | ✅ |
 | [career](plugins/career) | `job-digest` (headless weekday run, send-guarded) | ✅ |
-| retro, kitchen, training, … | see the [roadmap](docs/roadmap.md) | 🛠️ |
+| [retro](plugins/retro) | `rom-library` (audit, CHD/RVZ, playlists), `rom-sync` (adb / SD card) | ✅ |
+| kitchen, training, … | see the [roadmap](docs/roadmap.md) | 🛠️ |
 
 ## Use it
 

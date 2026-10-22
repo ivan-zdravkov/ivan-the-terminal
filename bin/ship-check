@@ -16,6 +16,9 @@ base=$(git merge-base HEAD origin/main 2>/dev/null || echo --root)
 "${lg[@]}" range "$base" HEAD
 gitleaks git --redact --no-banner --log-level warn .
 python3 -I -m unittest discover -q -s tools/leakguard 2>&1 | tail -1
+for d in plugins/*/skills/*/scripts; do
+  if compgen -G "$d/test_*.py" >/dev/null; then python3 -I -m unittest discover -q -s "$d" 2>&1 | tail -1; fi
+done
 python3 -I tools/lint_skills.py
 shellcheck -x bin/* .githooks/* shell/* plugins/*/skills/*/scripts/run
 if [ "$base" = --root ]; then n=$(git rev-list --count HEAD); else n=$(git rev-list --count "$base..HEAD"); fi
