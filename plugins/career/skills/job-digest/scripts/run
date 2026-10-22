@@ -18,8 +18,8 @@ DIGEST_TO="" MODEL="claude-sonnet-5-5"
 . "$CONF/config.env"
 [ -n "$DIGEST_TO" ] || { echo "job-digest: DIGEST_TO missing in $CONF/config.env" >&2; exit 2; }
 
-WORK="$STATE/work" LOGS="$STATE/logs"
-mkdir -p "$WORK" "$LOGS"
+mkdir -p "$STATE/work" "$STATE/logs"
+WORK=$(readlink -f "$STATE/work") LOGS="$STATE/logs"  # resolved: permission rules see real paths (/home may be a symlink)
 find "$WORK" -mindepth 1 -delete
 
 TOOLS="$SKILL/scripts"
@@ -42,8 +42,7 @@ jq -n --arg guard "$TOOLS/guard.py" --arg tools "$TOOLS" --arg to "$DIGEST_TO" '
 # Least privilege: no interpreter, no raw curl, Read only inside WORK. Untrusted mail and web pages flow
 # through this run, so anything broader turns a prompt injection into code execution or file exfiltration.
 G=mcp__claude_ai_Gmail
-# shellcheck disable=SC2088  # literal ~ is the permission-rule syntax for home, not a shell path
-work_rule="~/${WORK#"$HOME"/}/**"
+work_rule="/$WORK/**"  # "//abs/path" is the permission-rule syntax for an absolute path
 cmd=(claude -p --model "$MODEL" --permission-mode dontAsk --settings "$settings"
   --allowedTools
     "Bash($TOOLS/fetch:*)" "Bash($TOOLS/q:*)" "Bash($TOOLS/html:*)" "Bash(date:*)"
@@ -66,7 +65,7 @@ if [ $dry = 1 ]; then
 fi
 
 LOG="$LOGS/$(date +%F_%H%M).log"
-cd "$STATE" || exit 1
+cd "$WORK" || exit 1  # cwd = work dir: nothing else is in default read scope
 JOB_DIGEST_WORK="$WORK" "${cmd[@]}" <<<"$prompt" >"$LOG" 2>&1  # prompt on stdin: not visible in /proc/*/cmdline
 status=$?
 if [ $status -ne 0 ] && command -v notify-send >/dev/null; then notify-send "Job digest failed" "See $LOG"; fi
