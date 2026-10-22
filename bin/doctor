@@ -19,7 +19,8 @@ outdated=$(brew outdated --quiet 2>/dev/null || true)
 while read -r cmd formula purpose; do
   case "$cmd" in ''|'#'*) continue ;; esac
   if ! command -v "$cmd" >/dev/null; then r fail "tool:$cmd" "missing ($purpose): itt bootstrap"; continue; fi
-  if grep -qx "${formula%%@*}\(@.*\)\?" <<<"$outdated"; then
+  brew_managed=0; [[ "$(command -v "$cmd")" == "$(brew --prefix 2>/dev/null)"/* ]] && brew_managed=1
+  if [ $brew_managed = 1 ] && grep -qx "${formula%%@*}\(@.*\)\?" <<<"$outdated"; then
     if [ $update = 1 ] && brew upgrade -q "$formula" >/dev/null 2>&1; then r ok "tool:$cmd" "upgraded"
     else r warn "tool:$cmd" "update available: itt doctor --update"; fi
   else
@@ -40,7 +41,8 @@ if [ -f "$key" ]; then
   if ssh-keygen -y -P "" -f "$key" >/dev/null 2>&1; then r warn ssh-passphrase "$key has no passphrase: ssh-keygen -p -f $key"
   else r ok ssh-passphrase ""; fi
 fi
-if ssh -o BatchMode=yes -o ConnectTimeout=5 -T git@github.com 2>&1 | grep -q "successfully authenticated"; then r ok github-ssh ""
+ssh_out=$(ssh -o BatchMode=yes -o ConnectTimeout=5 -T git@github.com 2>&1 || true)  # exits 1 even on success
+if grep -q "successfully authenticated" <<<"$ssh_out"; then r ok github-ssh ""
 else r fail github-ssh "ssh -T git@github.com failed (agent unlocked? key on GitHub?)"; fi
 
 # --- guards
