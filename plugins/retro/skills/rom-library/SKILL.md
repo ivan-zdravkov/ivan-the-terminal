@@ -18,4 +18,4 @@ Library root and region preference come from `~/.config/ivan-the-terminal/retro.
    - `no-region-tag`: often hacks or translations; just mention them.
 4. After changing the library, offer to sync devices with the rom-sync skill.
 
-Dual-format users: if a game has a PS2 version, Ivan often prefers it over the GameCube one, but keep both when he says so.
+Personal library preferences (which version to keep, must-play lists, what not to emulate) live in the private overlay: read `~/Repositories/ivan-the-terrible/profile/retro.md` before making suggestions.

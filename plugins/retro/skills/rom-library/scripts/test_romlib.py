@@ -76,6 +76,16 @@ class Library(unittest.TestCase):
             romlib.cmd_convert(romlib.load_conf(), "psx", apply=False, delete_source=False, limit=0)
         self.assertEqual(before, sorted(p.name for p in (self.roms / "psx").iterdir()))
 
+    def test_cue_companions_never_escape_the_folder(self):
+        psx = self.roms / "psx"
+        outside = Path(self.tmp.name) / "thesis.bin"
+        outside.write_bytes(b"precious")
+        (psx / "Game C (USA).cue").write_text(
+            f'REM COMMENT "{outside}"\nTITLE "../../thesis.bin"\nFILE "../thesis.bin" BINARY\n'
+            f'FILE "{outside}" BINARY\nFILE "Game C (USA).bin" BINARY\n  TRACK 01 MODE2/2352\n')
+        self.assertEqual([psx / "Game C (USA).bin"], romlib.companions_of(psx / "Game C (USA).cue"))
+        self.assertTrue(outside.exists())
+
     def test_sync_to_directory_target(self):
         out = io.StringIO()
         with redirect_stdout(out):

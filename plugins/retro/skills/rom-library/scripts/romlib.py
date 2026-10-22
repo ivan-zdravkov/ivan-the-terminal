@@ -151,6 +151,29 @@ def cmd_audit(conf, systems, details, as_json):
     return 0
 
 
+def companions_of(sheet):
+    """Track files a .cue/.gdi references: plain names in the sheet's own folder with an image extension.
+    Untrusted input: REM/TITLE lines, absolute paths, ../ and symlinks are never returned."""
+    names = []
+    for line in sheet.read_text(errors="ignore").splitlines():
+        if sheet.suffix.lower() == ".cue":
+            m = re.match(r'\s*FILE\s+(?:"([^"]+)"|(\S+))\s+\w+\s*$', line, re.I)
+            if m:
+                names.append(m.group(1) or m.group(2))
+        else:  # gdi: "<track> <lba> <type> <sector> <file> <offset>"
+            parts = re.match(r'\s*\d+\s+\d+\s+\d+\s+\d+\s+(?:"([^"]+)"|(\S+))\s+-?\d+\s*$', line)
+            if parts:
+                names.append(parts.group(1) or parts.group(2))
+    out = []
+    for name in names:
+        if "/" in name or "\\" in name or name.startswith(".") or Path(name).suffix.lower() not in COMPANION_EXT:
+            continue
+        f = sheet.parent / name
+        if f.is_file() and not f.is_symlink() and f.resolve().parent == sheet.parent.resolve():
+            out.append(f)
+    return out
+
+
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True)
 
@@ -177,6 +200,7 @@ def cmd_convert(conf, system, apply, delete_source, limit):
     else:
         sys.exit(f"romlib: no conversion target for '{system}'")
     done = 0
+    sources = [p for p in sources if not p.is_symlink()]
     for archive in sources[:limit] if limit else sources:
         out = archive.with_suffix(".chd" if system in CHD_SYSTEMS else ".rvz")
         src, tmp = archive, None
@@ -195,7 +219,12 @@ def cmd_convert(conf, system, apply, delete_source, limit):
                 print(f"FAILED: can't extract {archive.name}")
                 shutil.rmtree(tmp, ignore_errors=True)
                 continue
-            inner = [p for p in tmp.rglob("*") if p.suffix.lower() in (CHD_SOURCES if system in CHD_SYSTEMS else RVZ_SOURCES)]
+            inner = [p for p in tmp.rglob("*") if not p.is_symlink()
+                     and p.suffix.lower() in (CHD_SOURCES if system in CHD_SYSTEMS else RVZ_SOURCES)]
+            if any(p.is_symlink() for p in tmp.rglob("*")):
+                print(f"skip: {archive.name} contains symlinks")
+                shutil.rmtree(tmp, ignore_errors=True)
+                continue
             if len(inner) != 1:
                 print(f"skip: {archive.name} holds {len(inner)} disc images")
                 shutil.rmtree(tmp, ignore_errors=True)
@@ -225,12 +254,7 @@ def cmd_convert(conf, system, apply, delete_source, limit):
                 archive.unlink()
             continue
         if delete_source:
-            companions = []
-            if src.suffix.lower() in {".cue", ".gdi"}:
-                for line in src.read_text(errors="ignore").splitlines():
-                    m = re.search(r'"([^"]+)"|(\S+\.(?:bin|raw|img))', line, re.I)
-                    if m:
-                        companions.append(src.parent / (m.group(1) or m.group(2)))
+            companions = companions_of(src) if src.suffix.lower() in {".cue", ".gdi"} else []
             for f in [src, *companions]:
                 f.unlink(missing_ok=True)
     print(f"romlib: {done} converted" if apply else "romlib: dry run, add --apply")
@@ -253,6 +277,9 @@ def cmd_m3u(conf, system, apply):
         if playlist.exists():
             continue
         moves = [(d, folder / d.name) for d in discs if d.parent != folder]
+        if any(new.exists() for _, new in moves) or len({new for _, new in moves}) != len(moves):
+            print(f"skip {title}: a disc with the same name already exists in {folder.name}/")
+            continue
         if not apply:
             print(f"would create {playlist.name} ({len(discs)} discs{', moving into folder' if moves else ''})")
             continue
