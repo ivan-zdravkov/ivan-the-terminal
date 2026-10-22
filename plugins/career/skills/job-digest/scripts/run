@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# job-digest: run the weekday job digest headless (claude -p) with a fixed tool allowlist and a send guard.
+#   run            real run (what the timer does): searches, triages Gmail, drafts replies, emails one digest
+#   run --dry-run  assemble prompt + command and print a summary; runs nothing
+# Private config: ~/.config/ivan-the-terminal/job-digest/{config.env,profile.md} (see ../config.example)
+set -uo pipefail
+SKILL="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/ivan-the-terminal/job-digest"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/ivan-the-terminal/job-digest"
+dry=0; [ "${1:-}" = --dry-run ] && dry=1
+
+if [ ! -f "$CONF/config.env" ] || [ ! -f "$CONF/profile.md" ]; then
+  echo "job-digest: not configured: create $CONF/config.env and profile.md (templates in $SKILL/config.example)"
+  exit 0
+fi
+DIGEST_TO="" MODEL="claude-sonnet-5-5"
+# shellcheck source=/dev/null
+. "$CONF/config.env"
+[ -n "$DIGEST_TO" ] || { echo "job-digest: DIGEST_TO missing in $CONF/config.env" >&2; exit 2; }
+
+WORK="$STATE/work" LOGS="$STATE/logs"
+mkdir -p "$WORK" "$LOGS"
+find "$WORK" -mindepth 1 -delete
+
+TOOLS="$SKILL/scripts"
+prompt=$(python3 -I - "$SKILL/references/prompt.md" "$CONF/profile.md" "$DIGEST_TO" "$WORK" "$TOOLS" <<'PY'
+import sys
+template, profile, to, work, tools = sys.argv[1:]
+text = open(template, encoding="utf-8").read()
+for key, value in (("{{PROFILE}}", open(profile, encoding="utf-8").read().strip()), ("{{DIGEST_TO}}", to),
+                   ("{{WORK}}", work), ("{{TOOLS}}", tools)):
+    text = text.replace(key, value)
+print(text)
+PY
+)
+
+settings="$STATE/settings.json"
+jq -n --arg guard "$TOOLS/guard.py" --arg tools "$TOOLS" --arg to "$DIGEST_TO" '{hooks: {PreToolUse: [{
+  matcher: "Bash|mcp__claude_ai_Gmail__.*",
+  hooks: [{type: "command", command: ("python3 -I " + ($guard | @sh) + " " + ($tools | @sh) + " " + ($to | @sh))}]}]}}' > "$settings"
+
+# Least privilege: no interpreter, no raw curl, Read only inside WORK. Untrusted mail and web pages flow
+# through this run, so anything broader turns a prompt injection into code execution or file exfiltration.
+G=mcp__claude_ai_Gmail
+# shellcheck disable=SC2088  # literal ~ is the permission-rule syntax for home, not a shell path
+work_rule="~/${WORK#"$HOME"/}/**"
+cmd=(claude -p --model "$MODEL" --permission-mode dontAsk --settings "$settings"
+  --allowedTools
+    "Bash($TOOLS/fetch:*)" "Bash($TOOLS/q:*)" "Bash($TOOLS/html:*)" "Bash(date:*)"
+    "Read($work_rule)" "WebSearch" "WebFetch"
+    "${G}__search_threads" "${G}__get_thread" "${G}__get_message" "${G}__list_labels"
+    "${G}__label_thread" "${G}__label_message" "${G}__list_drafts" "${G}__get_draft"
+    "${G}__create_draft" "${G}__send_message" "${G}__unlabel_thread"
+  --disallowedTools
+    "${G}__forward" "${G}__reply" "${G}__trash_message" "${G}__trash_thread"
+    "${G}__delete_draft" "${G}__delete_label" "${G}__mark_message_spam" "${G}__mark_thread_spam"
+    "${G}__update_draft" "${G}__untrash_message" "${G}__untrash_thread" "${G}__create_label" "${G}__update_label"
+    "Edit" "Write" "NotebookEdit")
+
+if [ $dry = 1 ]; then
+  echo "prompt: $(wc -c <<<"$prompt") bytes, $(grep -c '{{' <<<"$prompt") unfilled placeholders"
+  echo "model: $MODEL  digest to: $DIGEST_TO  work: $WORK"
+  echo "guard: $(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")"
+  echo "allowed: $(printf '%s\n' "${cmd[@]}" | sed -n '/--allowedTools/,/--disallowedTools/p' | sed '1d;$d' | tr '\n' ' ')"
+  exit 0
+fi
+
+LOG="$LOGS/$(date +%F_%H%M).log"
+cd "$STATE" || exit 1
+JOB_DIGEST_WORK="$WORK" "${cmd[@]}" <<<"$prompt" >"$LOG" 2>&1  # prompt on stdin: not visible in /proc/*/cmdline
+status=$?
+if [ $status -ne 0 ] && command -v notify-send >/dev/null; then notify-send "Job digest failed" "See $LOG"; fi
+find "$LOGS" -name '*.log' -mtime +30 -delete
+exit $status

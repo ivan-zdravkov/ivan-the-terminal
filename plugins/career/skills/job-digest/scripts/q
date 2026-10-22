@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# q [-s] NAME FILTER: run jq -r on a file in the digest work dir (no other files, no env, no modules).
+set -euo pipefail
+WORK="${JOB_DIGEST_WORK:?JOB_DIGEST_WORK not set}"
+opts=(-r)
+if [ "${1:-}" = -s ]; then opts+=(-s); shift; fi
+[ $# -eq 2 ] || { echo "usage: q [-s] NAME FILTER" >&2; exit 2; }
+name=$1 filter=$2
+[[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$ ]] || { echo "q: NAME must be a file in the work dir" >&2; exit 2; }
+# shellcheck disable=SC2016  # literal jq tokens, not shell expansions
+case "$filter" in
+  *import*|*include*|*'$ENV'*|*env*|*'$__'*|*input*) echo "q: filter uses a blocked jq feature" >&2; exit 2 ;;
+esac
+exec jq "${opts[@]}" -- "$filter" "$WORK/$name"

@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""html MODE NAME [REGEX]: read a page saved by fetch (work dir only) and print compact results.
+  links  NAME [REGEX]  anchor text <TAB> absolute href, optionally only hrefs/text matching REGEX
+  emails NAME          e-mail addresses found anywhere in the source (incl. mailto: and lightly obfuscated)
+  text   NAME          visible text, whitespace-collapsed, first 20k chars
+  rss    NAME          RSS/Atom items: date <TAB> title <TAB> link
+"""
+import html
+import os
+import re
+import sys
+import xml.etree.ElementTree as ET
+from html.parser import HTMLParser
+from pathlib import Path
+from urllib.parse import urljoin
+
+
+class Page(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.links, self.text, self._href, self._buf, self._skip, self.base = [], [], None, [], 0, ""
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag in ("script", "style", "noscript"):
+            self._skip += 1
+        elif tag == "base" and a.get("href"):
+            self.base = a["href"]
+        elif tag == "a" and a.get("href"):
+            self._href, self._buf = a["href"], []
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "noscript") and self._skip:
+            self._skip -= 1
+        elif tag == "a" and self._href is not None:
+            self.links.append((" ".join("".join(self._buf).split()), self._href))
+            self._href = None
+
+    def handle_data(self, data):
+        if not self._skip:
+            self.text.append(data)
+            if self._href is not None:
+                self._buf.append(data)
+
+
+def main(argv):
+    if len(argv) < 2 or argv[0] not in ("links", "emails", "text", "rss"):
+        print(__doc__, file=sys.stderr)
+        return 2
+    work = Path(os.environ.get("JOB_DIGEST_WORK", "")).resolve()
+    path = (work / argv[1]).resolve()
+    if not os.environ.get("JOB_DIGEST_WORK") or path.parent != work or not path.is_file():
+        print("html: NAME must be a file in the work dir", file=sys.stderr)
+        return 2
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    mode = argv[0]
+    if mode == "rss":
+        root = ET.fromstring(raw.encode())
+        for item in root.iter():
+            if item.tag.split("}")[-1] in ("item", "entry"):
+                get = {c.tag.split("}")[-1]: (c.text or c.get("href") or "").strip() for c in item}
+                print(f"{get.get('pubDate') or get.get('updated', '')}\t{get.get('title', '')}\t{get.get('link', '')}")
+        return 0
+    if mode == "emails":
+        text = html.unescape(raw)
+        text = re.sub(r"\s*(?:\[at\]|\(at\)|&#64;)\s*", "@", text, flags=re.I)
+        found = sorted(set(re.findall(r"[\w.%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}", text)))
+        print("\n".join(found) or "(none)")
+        return 0
+    page = Page()
+    page.feed(raw)
+    if mode == "text":
+        print(" ".join(" ".join(page.text).split())[:20000])
+        return 0
+    pattern = re.compile(argv[2], re.I) if len(argv) > 2 else None
+    seen = set()
+    for text, href in page.links:
+        href = urljoin(page.base, href)
+        if (pattern and not (pattern.search(href) or pattern.search(text))) or href in seen:
+            continue
+        seen.add(href)
+        print(f"{text}\t{href}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
