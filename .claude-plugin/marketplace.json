@@ -26,6 +26,12 @@
       "source": "./plugins/career",
       "description": "Unattended weekday job digest: job feeds and boards, recruiter-mail triage, reply and outreach drafts (never sent), job-alert cleanup, one ranked email, all behind a send guard.",
       "category": "productivity"
+    },
+    {
+      "name": "retro",
+      "source": "./plugins/retro",
+      "description": "Emulation library care: audit, CHD/RVZ conversion, multi-disc playlists, 50 Hz detection, and device sync over adb or to SD cards.",
+      "category": "entertainment"
     }
   ]
 }

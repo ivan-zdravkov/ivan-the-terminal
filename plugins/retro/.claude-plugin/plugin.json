@@ -1,0 +1,13 @@
+{
+  "name": "retro",
+  "version": "0.1.0",
+  "description": "Keep an emulation library tidy and playable: audit (formats, playlists, 50 Hz titles, duplicates, junk), convert to CHD/RVZ, build multi-disc playlists, and sync systems to an Android handheld or SD card.",
+  "author": {
+    "name": "Ivan Zdravkov",
+    "url": "https://github.com/ivan-zdravkov"
+  },
+  "homepage": "https://github.com/ivan-zdravkov/ivan-the-terminal",
+  "repository": "https://github.com/ivan-zdravkov/ivan-the-terminal",
+  "license": "MIT",
+  "keywords": ["emulation", "retro", "roms", "chd", "rvz", "es-de", "adb"]
+}
