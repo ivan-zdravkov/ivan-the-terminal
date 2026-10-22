@@ -1,0 +1,13 @@
+{
+  "name": "career",
+  "version": "0.1.0",
+  "description": "Unattended job search: a weekday headless Claude run that scans remote job feeds and boards, triages recruiter mail, drafts replies and cold outreach (never sends), archives job alerts and emails one ranked digest, behind a send guard.",
+  "author": {
+    "name": "Ivan Zdravkov",
+    "url": "https://github.com/ivan-zdravkov"
+  },
+  "homepage": "https://github.com/ivan-zdravkov/ivan-the-terminal",
+  "repository": "https://github.com/ivan-zdravkov/ivan-the-terminal",
+  "license": "MIT",
+  "keywords": ["job-search", "gmail", "headless", "automation", "freelance", "digest"]
+}

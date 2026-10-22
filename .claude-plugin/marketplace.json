@@ -20,6 +20,12 @@
       "source": "./plugins/homelab",
       "description": "Keep a Linux home machine healthy: daily health check with notifications (updates, disks, SMART, mounts, services, containers, tailnet) and guided system updates.",
       "category": "productivity"
+    },
+    {
+      "name": "career",
+      "source": "./plugins/career",
+      "description": "Unattended weekday job digest: job feeds and boards, recruiter-mail triage, reply and outreach drafts (never sent), job-alert cleanup, one ranked email, all behind a send guard.",
+      "category": "productivity"
     }
   ]
 }

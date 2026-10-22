@@ -1,0 +1,11 @@
+# ~/.config/ivan-the-terminal/job-digest/config.env
+DIGEST_TO="you@example.com"      # the ONLY address the run may send to (the guard enforces it)
+MODEL="claude-sonnet-5-5"
+
+# ~/.config/ivan-the-terminal/job-digest/profile.md  (inserted as the PROFILE section)
+# ## Candidate     who you are, stack, strengths, track record with numbers, links, location, languages
+# ## Wants         engagement type and hours, availability, stack preferences, rate (target / direct-client / floor)
+# ## Filters       location, language and rate rules; conflict-check list (competitors of your current employer)
+# ## Search        <TERM> values for the feeds, extra sources (boards, URLs), web-search query ideas
+# ## Outreach      working language, how to phrase the rate, default self-ratings, sign-off
+# ## Signature     exact HTML and plain-text signature

@@ -53,7 +53,8 @@ flowchart LR
 |---|---|---|
 | [foundation](plugins/foundation) | `doctor`, `new-machine`, `ship-public`, `kaizen` | ✅ |
 | [homelab](plugins/homelab) | `homelab-check` (daily, notifies), `system-updates` | ✅ |
-| retro, career, kitchen, training, … | see the [roadmap](docs/roadmap.md) | 🛠️ |
+| [career](plugins/career) | `job-digest` (headless weekday run, send-guarded) | ✅ |
+| retro, kitchen, training, … | see the [roadmap](docs/roadmap.md) | 🛠️ |
 
 ## Use it
 
