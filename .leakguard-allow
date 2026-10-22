@@ -1,0 +1,3 @@
+# Generic-rule exceptions (regex, full match). The private denylist can never be bypassed.
+# path:<glob> skips generic rules for matching files.
+ivan@zdravkov\.dev

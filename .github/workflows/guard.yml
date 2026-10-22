@@ -1,0 +1,87 @@
+name: guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guard-${{ github.ref }}
+  # never cancel runs on main: each push scans only its own commits
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  leakguard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan tree, every commit and PR text
+        env:
+          LEAKGUARD_DENYLIST_CONTENT: ${{ secrets.LEAKGUARD_DENYLIST }}
+          SAME_REPO: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Run the guard and allowlist from the base branch so a PR can't neuter its own check.
+          src=tools/leakguard/leakguard.py
+          if [ -n "$PR_BASE" ] && git show "$PR_BASE:$src" > "$RUNNER_TEMP/leakguard.py" 2>/dev/null; then
+            src="$RUNNER_TEMP/leakguard.py"
+            git show "$PR_BASE:.leakguard-allow" > "$RUNNER_TEMP/allow" 2>/dev/null || : > "$RUNNER_TEMP/allow"
+            export LEAKGUARD_ALLOW_FILE="$RUNNER_TEMP/allow"
+          fi
+          lg=(python3 -I "$src" --redact)
+          # Forks get no secrets; our own branches must always be checked against the denylist.
+          if [ "$SAME_REPO" = true ]; then lg+=(--require-denylist); fi
+          "${lg[@]}" tree
+          if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then base=$BASE_SHA; else base=--root; fi
+          "${lg[@]}" range "$base" "$HEAD_SHA"
+          printf '%s\n%s\n' "$PR_TITLE" "$PR_BODY" | "${lg[@]}" text -
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks (pinned, checksum-verified)
+        env:
+          VERSION: 8.30.1
+          SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -sSfLo gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "${SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+      - name: Scan full history (base-branch config; PR-supplied ignores disregarded)
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          cfg="$RUNNER_TEMP/gitleaks.toml"
+          if [ -z "$PR_BASE" ] || ! git show "$PR_BASE:.gitleaks.toml" > "$cfg" 2>/dev/null; then
+            printf '[extend]\nuseDefault = true\n' > "$cfg"
+          fi
+          : > "$RUNNER_TEMP/gitleaksignore"
+          "$RUNNER_TEMP/gitleaks" git --config "$cfg" --gitleaks-ignore-path "$RUNNER_TEMP/gitleaksignore" --redact --no-banner -v .
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: leakguard unit tests
+        run: python3 -I -m unittest discover -v -s tools/leakguard
+      - name: Skill and manifest lint
+        run: python3 -I tools/lint_skills.py
+      - name: Shell lint
+        run: shellcheck -x bin/* .githooks/*

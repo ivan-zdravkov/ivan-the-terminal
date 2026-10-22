@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Commit messages are public too.
+set -euo pipefail
+ROOT=$(git rev-parse --show-toplevel)
+lg=(python3 -I "$ROOT/tools/leakguard/leakguard.py")
+[ "$(git config --bool leakguard.requireDenylist || true)" = true ] && lg+=(--require-denylist)
+"${lg[@]}" text "$1"  # '#' lines included: with -m they survive into the commit

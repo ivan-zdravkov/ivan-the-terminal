@@ -1,0 +1,19 @@
+{
+  "name": "ivan-the-terminal",
+  "owner": {
+    "name": "Ivan Zdravkov",
+    "email": "ivan@zdravkov.dev"
+  },
+  "metadata": {
+    "description": "Self-hosted copilot skills for Claude Code: home infrastructure, retro gaming, career, kitchen and training. Lean on tokens, private by construction.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "foundation",
+      "source": "./plugins/foundation",
+      "description": "Setup, health checks and safe publishing: doctor, new-machine bootstrap, and a leak-guarded ship-public flow.",
+      "category": "productivity"
+    }
+  ]
+}
