@@ -1,0 +1,13 @@
+{
+  "name": "homelab",
+  "version": "0.1.0",
+  "description": "Keep a Linux home machine healthy: one-pass health check (OS image, apps, firmware, disks, SMART, mounts, services, containers, tailnet) with a daily notifying timer, plus guided system updates.",
+  "author": {
+    "name": "Ivan Zdravkov",
+    "url": "https://github.com/ivan-zdravkov"
+  },
+  "homepage": "https://github.com/ivan-zdravkov/ivan-the-terminal",
+  "repository": "https://github.com/ivan-zdravkov/ivan-the-terminal",
+  "license": "MIT",
+  "keywords": ["homelab", "monitoring", "updates", "fedora", "bazzite", "systemd", "smart"]
+}

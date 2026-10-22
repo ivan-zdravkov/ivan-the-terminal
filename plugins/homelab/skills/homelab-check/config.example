@@ -1,0 +1,9 @@
+# ~/.config/ivan-the-terminal/homelab.conf  (sourced by bash)
+DISK_WARN=90          # % used
+DISK_FAIL=95
+STAGED_WARN_DAYS=3    # nag when a staged OS image waits this long for a reboot
+WATCH_USER_UNITS="sunshine.service my-job.timer"   # systemctl --user units; .timer checks the last run
+WATCH_SYSTEM_UNITS="jellyfin.service"
+WATCH_CONTAINERS="flaresolverr"                      # podman container names
+WATCH_PEERS="nas, phone"                             # tailnet host names, comma separated
+SKIP=""               # any of: os flatpak brew firmware disks mounts smart services containers network tailscale

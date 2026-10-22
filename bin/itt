@@ -10,7 +10,8 @@ usage: itt <command> [args]
   doctor [-v] [--update]   health check: toolchain, auth, guards, overlay, links
   bootstrap                set up / repair this machine (idempotent)
   ship-check               every local gate a branch must pass before it is pushed
-  guard <mode> [...]       run leakguard directly (staged | range B H | tree | text F)
+  guard <mode> [...]       run leakguard directly (staged | range B H | tree | text F | candidates B H)
+  run <skill> [args]       run a skill's script (plugins/*/skills/<skill>/scripts/run)
 USAGE
 }
 
@@ -18,6 +19,10 @@ cmd="${1:-help}"; [ $# -gt 0 ] && shift
 case "$cmd" in
   doctor|bootstrap|ship-check) exec "$ITT_HOME/bin/$cmd" "$@" ;;
   guard) exec python3 -I "$ITT_HOME/tools/leakguard/leakguard.py" "$@" ;;
+  run)
+    skill="${1:?usage: itt run <skill> [args]}"; shift
+    for s in "$ITT_HOME"/plugins/*/skills/"$skill"/scripts/run; do [ -x "$s" ] && exec "$s" "$@"; done
+    echo "itt: no runnable skill '$skill'" >&2; exit 2 ;;
   help|-h|--help) usage ;;
   *) usage >&2; exit 2 ;;
 esac

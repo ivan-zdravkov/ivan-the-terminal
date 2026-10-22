@@ -64,6 +64,12 @@ for s in "$ITT_HOME"/plugins/*/skills/*/; do
   [ "$(readlink -f "$HOME/.claude/skills/$n")" = "$(readlink -f "$s")" ] || r warn "skill:$n" "not linked: itt bootstrap"
 done
 
+for timer in "$ITT_HOME"/plugins/*/systemd/*.timer; do
+  [ -e "$timer" ] || continue
+  systemctl --user is-enabled -q "$(basename "$timer")" 2>/dev/null && r ok "timer:$(basename "$timer" .timer)" "" \
+    || r warn "timer:$(basename "$timer" .timer)" "not enabled: itt bootstrap"
+done
+
 # --- GitHub-side protection (skipped offline)
 slug=$(git -C "$ITT_HOME" remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')
 if [ -n "$slug" ]; then
