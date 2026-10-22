@@ -51,7 +51,7 @@ flowchart LR
 
 | Plugin | Skills | Status |
 |---|---|---|
-| [foundation](plugins/foundation) | `doctor`, `new-machine`, `ship-public` | ✅ |
+| [foundation](plugins/foundation) | `doctor`, `new-machine`, `ship-public`, `kaizen` | ✅ |
 | homelab, retro, career, kitchen, training, … | see the [roadmap](docs/roadmap.md) | 🛠️ |
 
 ## Use it

@@ -66,6 +66,12 @@ class GenericRules(unittest.TestCase):
         self.assertIn("iban", rules_hit(J(["GB82", " WEST 1234 5698 7654 32"])))
         self.assertNotIn("iban", rules_hit(J(["GB00", " WEST 1234 5698 7654 32"])))
 
+    def test_bank_details(self):
+        self.assertIn("payment-card", rules_hit(J(["4111 ", "1111 1111 1111"])))
+        self.assertNotIn("payment-card", rules_hit(J(["4111 ", "1111 1111 1112"])))
+        self.assertIn("bank-account", rules_hit("IBAN: " + J(["BG80", "BNBG96611020345678"])))
+        self.assertEqual(set(), rules_hit("IBANs and account numbers are blocked, a BIC with an account too"))
+
     def test_inline_allow(self):
         line = ".".join(["10", "0", "0", "1"]) + "  # leakguard" + ":allow"
         self.assertEqual(set(), rules_hit(line))
@@ -191,6 +197,17 @@ class GitBypasses(unittest.TestCase):
         self.git("rm", "-q", "evil.txt")
         self.git("commit", "-qm", "cleanup")
         self.assertTrue(self.scan("range", "HEAD~2", "HEAD"))
+
+    def test_candidates_surface_unknown_proper_nouns(self):
+        (self.repo / "doc.md").write_text("We met Zorbalina at the Placeholderton club; the club was fine.\n")
+        self.git("add", "-A")
+        self.git("commit", "-qm", "doc")
+        out = io.StringIO()
+        with mock.patch("sys.stdout", out), redirect_stderr(io.StringIO()):
+            leakguard.cmd_candidates(leakguard.Guard(), "HEAD~1", "HEAD")
+        terms = {line.split("\t")[1] for line in out.getvalue().splitlines()}
+        self.assertTrue({"Zorbalina", "Placeholderton"} <= terms)
+        self.assertNotIn("club", terms)
 
     def test_documents_are_rejected(self):
         (self.repo / "cv.pdf").write_bytes(b"%PDF-1.7 clean")

@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Self-hosted copilot skills for Claude Code: home infrastructure, retro gaming, career, kitchen and training. Lean on tokens, private by construction.",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "plugins": [
     {

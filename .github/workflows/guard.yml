@@ -84,4 +84,4 @@ jobs:
       - name: Skill and manifest lint
         run: python3 -I tools/lint_skills.py
       - name: Shell lint
-        run: shellcheck -x bin/* .githooks/*
+        run: shellcheck -x bin/* .githooks/* shell/*

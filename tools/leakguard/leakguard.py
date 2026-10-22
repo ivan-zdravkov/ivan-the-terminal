@@ -13,6 +13,7 @@ Usage:
   leakguard.py [--redact] [--require-denylist] range BASE HEAD  # pre-push / CI (BASE=--root: all history)
   leakguard.py [--redact] [--require-denylist] tree             # all tracked files
   leakguard.py [--redact] [--require-denylist] text [FILE|-]    # messages, PR bodies
+  leakguard.py candidates BASE HEAD  # terms in added lines that *might* be personal (for review)
   leakguard.py claude-hook      # Claude Code PreToolUse hook (JSON on stdin)
 
 Exit codes: 0 clean, 1 findings, 2 blocked (claude-hook) or usage error.
@@ -73,6 +74,12 @@ def _phone_ok(m):
     return not 8 <= sum(c.isdigit() for c in m.group(0)) <= 15
 
 
+def _luhn_ok(m):
+    digits = [int(c) for c in m.group(0) if c.isdigit()]
+    total = sum(d if i % 2 == 0 else (d * 2 - 9 if d > 4 else d * 2) for i, d in enumerate(reversed(digits)))
+    return total % 10 != 0
+
+
 def _iban_ok(m):
     s = m.group(0).replace(" ", "")
     s = s[4:] + s[:4]
@@ -94,6 +101,9 @@ RULES = [  # (id, pattern, is_false_positive)
     ("age-secret-key", re.compile(r"AGE-SECRET-KEY-1[0-9A-Z]{20,}"), None),
     ("coordinates", re.compile(r"(?<![\w.])-?\d{1,2}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}(?![\w.])"), None),
     ("iban", re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,3})?\b"), _iban_ok),
+    ("payment-card", re.compile(r"(?<![\d-])[2-6]\d{3}(?:[ -]?\d{4}){2}[ -]?\d{1,7}(?![\d-])"), _luhn_ok),
+    ("bank-account", re.compile(r"(?i)\b(?:iban|bic|swift(?:\s*code)?|sort\s*code|routing\s*(?:number|no)"
+                                r"|account\s*(?:number|no\.?))\s*[:=#-]?\s*(?-i:(?=[A-Z0-9]*\d)[A-Z0-9]{6,})"), None),
     ("wifi-secret", re.compile(r"(?i)\b(?:psk|wpa_passphrase|wifi_?pass(?:word)?)\s*[=:]\s*\S+"), None),
 ]
 TOKEN = re.compile(r"[^\s\"'`<>()\[\]{},;=]+")
@@ -278,6 +288,33 @@ def cmd_tree(g):
             g.scan_blob(path, (ROOT / path).read_bytes())
 
 
+REVIEWED_FILE = ROOT / ".leakguard-reviewed"
+CANDIDATE = re.compile(r"(?<![\w@./-])(?:[A-Z][a-z]+(?:[A-Z][a-z]+)*|[\u0400-\u04FF]{3,})(?![\w])|\b\d{4,}\b|@[\w.-]{3,}")
+
+
+def cmd_candidates(g, base, head):
+    """List terms from added lines that a human should classify: proper-noun-like words never seen in lowercase
+    in the repo, Cyrillic words, long numbers, handles. Skips terms already in .leakguard-reviewed."""
+    rng = head if base == "--root" else f"{base}..{head}"
+    added = [l[1:] for l in git("log", "-p", *DIFF, "--format=%B", rng).splitlines()
+             if l.startswith("+") and not l.startswith("+++")]
+    corpus = set(re.findall(r"\b[a-z][a-z]+\b", " ".join(
+        (ROOT / p).read_text(errors="ignore") for p in git("ls-files").splitlines()
+        if (ROOT / p).is_file() and Path(p).suffix.lower() not in OPAQUE_EXT)))
+    reviewed = set()
+    if REVIEWED_FILE.is_file():
+        reviewed = {l.strip().casefold() for l in REVIEWED_FILE.read_text().splitlines() if l.strip() and l[0] != "#"}
+    counts = {}
+    for line in added:
+        for term in CANDIDATE.findall(line):
+            if term.casefold() in reviewed or term.lower() in corpus:
+                continue
+            counts[term] = counts.get(term, 0) + 1
+    for term, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+        print(f"{n}\t{term}")
+    return 0
+
+
 def _inside_root(p):
     try:
         Path(p).resolve().relative_to(ROOT)
@@ -351,6 +388,8 @@ def main(argv):
         src = rest[0] if rest else "-"
         g.scan_text("text" if src == "-" else src,
                     sys.stdin.read() if src == "-" else Path(src).read_text(encoding="utf-8"))
+    elif cmd == "candidates" and len(rest) == 2:
+        return cmd_candidates(g, *rest)
     elif cmd == "claude-hook":
         return cmd_claude_hook(g)
     else:
