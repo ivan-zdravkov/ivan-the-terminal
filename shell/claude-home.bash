@@ -2,7 +2,7 @@
 # Every interactive `claude` starts in ivan-the-terminal, so its CLAUDE.md, skills, hooks and memory always load.
 # The launch directory is added with --add-dir; for your own repos (under $ITT_REPOS) its CLAUDE.md loads too.
 # Runs in place instead when launched:
-#   - inside ivan-the-terminal or any other checkout/worktree of it (keeps that checkout's own hooks)
+#   - inside ivan-the-terminal or any checkout, worktree or clone of it (keeps that checkout's own hooks)
 #   - inside a git repo outside $ITT_REPOS (an untrusted clone must not meet your personal context)
 # Bypass: CLAUDE_HERE=1 claude ...   (e.g. to --resume a session that belongs to another directory)
 # Headless runs (-p/--print) and scripts are untouched: shell functions don't exist there.
@@ -16,8 +16,9 @@ claude() {
   here=$(pwd -P) home=$(cd "$home" && pwd -P) repos=$(cd "$repos" 2>/dev/null && pwd -P || echo "$repos")
   if top=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null); then
     common=$(git -C "$here" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
-    if [ "$common" = "$(git -C "$home" rev-parse --path-format=absolute --git-common-dir)" ]; then
-      command claude "$@"; return  # a checkout or worktree of ivan-the-terminal itself
+    if [ "$common" = "$(git -C "$home" rev-parse --path-format=absolute --git-common-dir)" ] \
+      || { [ -f "$top/tools/leakguard/leakguard.py" ] && grep -qs leakguard.py "$top/.claude/settings.json"; }; then
+      command claude "$@"; return  # a checkout, worktree or clone of ivan-the-terminal: keep its own hooks
     fi
     case "$top/" in
       "$repos/"*) ;;

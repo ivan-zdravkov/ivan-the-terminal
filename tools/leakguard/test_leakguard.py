@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -72,7 +73,7 @@ class GenericRules(unittest.TestCase):
         self.assertIn("bank-account", rules_hit("IBAN: " + J(["BG80", "BNBG96611020345678"])))
         self.assertEqual(set(), rules_hit("IBANs and account numbers are blocked, a BIC with an account too"))
         card = J(["4111 ", "1111 1111 1111"])
-        for text in (card + " 12/27 123", card.replace(" ", "."), card.replace(" ", "_"), J(["3782 ", "822463 10005"])):
+        for text in (card + " 12/27 123", card.replace(" ", "-"), card.replace(" ", ""), J(["3782 ", "822463 10005"])):
             self.assertIn("payment-card", rules_hit(text), text)
         n8, n9 = J(["1234", "5678"]), J(["0210", "00021"])
         for text in (f"account_number: {n8}", f'"accountNumber": "{n8}"', f"Account #: {n8}",
@@ -80,6 +81,12 @@ class GenericRules(unittest.TestCase):
             self.assertIn("bank-account", rules_hit(text), text)
         for text in (J(["gb82", "west12345698765432"]), J(["GB82-", "WEST-1234-5698-7654-32"])):
             self.assertIn("iban", rules_hit(text), text)
+        nbsp = "\u00a0"
+        self.assertIn("iban", rules_hit(nbsp.join(["DE89", "3704", "0044", "0532", "0130", "00"])))
+        self.assertIn("payment-card", rules_hit("\t".join([J(["41", "11"]), "1111", "1111", "1111"])))
+        for text in ("IMG_20240825_143041.jpg", "build 20241220003731", "Swift 5.7 - 2022-06-01",
+                     "account 2023-2024 summary", "version 3.9.19.32572.2401", "589-636-7553 520-387-8521"):
+            self.assertEqual(set(), rules_hit(text), text)
         for text in ("my GitHub account: some-user", "account settings 2FA", "Account 1 of 3", "2026-10-22 10:15:00"):
             self.assertEqual(set(), rules_hit(text), text)
 
@@ -223,6 +230,20 @@ class GitBypasses(unittest.TestCase):
         terms = {line.split("\t")[1] for line in out.getvalue().splitlines()}
         self.assertTrue({"Zorbalina", "Placeholderton"} <= terms)
         self.assertNotIn("club", terms)
+
+    def test_hook_covers_separate_clones(self):
+        clone = Path(self.tmp.name + "-clone")
+        (clone / "tools" / "leakguard").mkdir(parents=True)
+        (clone / ".claude").mkdir()
+        (clone / "tools" / "leakguard" / "leakguard.py").write_text("")
+        (clone / ".claude" / "settings.json").write_text('{"command": "leakguard.py claude-hook"}')
+        subprocess.run(["git", "init", "-q", str(clone)], check=True)
+        try:
+            payload = {"tool_name": "Write", "tool_input": {"file_path": str(clone / "a.md"), "content": self.NAME}}
+            with mock.patch("sys.stdin", io.StringIO(json.dumps(payload))), redirect_stderr(io.StringIO()):
+                self.assertEqual(2, leakguard.cmd_claude_hook(leakguard.Guard()))
+        finally:
+            shutil.rmtree(clone)
 
     def test_hook_covers_worktrees(self):
         wt = Path(self.tmp.name + "-wt")

@@ -28,6 +28,8 @@ import re
 import shlex
 import subprocess
 import sys
+import traceback
+import unicodedata
 from pathlib import Path
 
 
@@ -79,16 +81,19 @@ def _luhn(digits):
     return total % 10 == 0
 
 
+CARD_IIN = re.compile(r"4\d{12}(?:\d{3}){0,2}|(?:5[1-5]\d{2}|222[1-9]|22[3-9]\d|2[3-6]\d{2}|27[01]\d|2720)\d{12}"
+                      r"|3[47]\d{13}|6(?:011|5\d{2})\d{12,15}")
+
+
 def _luhn_ok(m):
-    """False positive unless some run of whole digit groups (13-19 digits) passes Luhn: '4111 ... 1111 12/27' is a card."""
-    groups = [[int(c) for c in g] for g in re.split(r"[ .\-_\u00a0]+", m.group(0)) if g]
-    for start in range(len(groups)):
-        digits = []
-        for g in groups[start:]:
-            digits += g
-            if 13 <= len(digits) <= 19 and digits[0] in (2, 3, 4, 5, 6) and _luhn(digits):
-                return False
-    return True
+    """False positive unless the whole match is a real card: issuer prefix + length + Luhn."""
+    digits = re.sub(r"\D", "", m.group(0))
+    return not (CARD_IIN.fullmatch(digits) and _luhn([int(c) for c in digits]))
+
+
+def bank_view(line):
+    """Normalise copy-paste artefacts (NBSP, thin spaces, tabs, full-width digits, slashes) for the bank rules."""
+    return re.sub(r"[\s/,\u2013\u2014]+", " ", unicodedata.normalize("NFKC", line))
 
 
 def _account_ok(m):
@@ -115,15 +120,18 @@ RULES = [  # (id, pattern, is_false_positive)
     ("private-key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), None),
     ("age-secret-key", re.compile(r"AGE-SECRET-KEY-1[0-9A-Z]{20,}"), None),
     ("coordinates", re.compile(r"(?<![\w.])-?\d{1,2}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}(?![\w.])"), None),
-    ("iban", re.compile(r"(?i)\b[A-Z]{2}\d{2}(?:[ -]?[A-Z0-9]{4}){3,7}(?:[ -]?[A-Z0-9]{1,3})?\b"), _iban_ok),
-    ("payment-card", re.compile(r"(?<!\d)[2-6](?:[ .\-_\u00a0]{0,2}\d){12,18}(?!\d)"), _luhn_ok),
+    ("iban", re.compile(r"(?i)\b[A-Z]{2} ?\d{2}(?:[ .-]?[A-Z0-9]{4}){3,7}(?:[ .-]?[A-Z0-9]{1,3})?\b"), _iban_ok),
+    # card layouts: 4-4-4-4(+), Amex 4-6-5, or contiguous; one consistent separator
+    ("payment-card", re.compile(r"(?<![\d.])(?:\d{4}([ -]?)\d{4}\1\d{4}\1\d{1,7}|\d{4}([ -]?)\d{6}\2\d{4,5}|\d{13,19})(?![\d.])"),
+     _luhn_ok),
     ("bank-account", re.compile(
-        r"(?i)\b(?:iban|bic|swift(?:[\s_-]*code)?|sort[\s_-]*code|routing[\s_-]*(?:number|no)|aba|acct"
-        r"|account(?:[\s_-]*(?:number|num|no))?|kontonummer|bankkonto|сметка)\b\.?[\"']?\s*(?:(?:[:=#-]|is)\s*){0,2}[\"']?"
+        r"(?i)\b(?:(?:iban|sort[\s_-]*code|routing[\s_-]*(?:number|no)|aba|acct|kontonummer|bankkonto|сметка"
+        r"|account[\s_-]*(?:number|num|no))\b\.?|account\s*(?=[:=#]))[\"']?\s*(?:(?:[:=#-]|is)\s*){0,2}[\"']?"
         r"(?-i:(?=[A-Z0-9 .-]*\d)[A-Z0-9][A-Z0-9 .-]{4,32}[A-Z0-9])"), _account_ok),
+    ("bic", re.compile(r"(?i)\b(?:bic|swift[\s_-]*code|swift)\s*[:=#]\s*(?-i:[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b"), None),
     ("wifi-secret", re.compile(r"(?i)\b(?:psk|wpa_passphrase|wifi_?pass(?:word)?)\s*[=:]\s*\S+"), None),
 ]
-HARD_RULES = {"payment-card", "iban", "bank-account", "private-key", "age-secret-key"}  # no allowlist, no inline allow
+HARD_RULES = {"payment-card", "iban", "bank-account", "bic", "private-key", "age-secret-key"}  # no allowlist, no inline allow
 TOKEN = re.compile(r"[^\s\"'`<>()\[\]{},;=]+")
 SUBTOKEN = re.compile(r"[:/@?&#.+|\\]")
 
@@ -190,11 +198,12 @@ class Guard:
         if deny_only:
             return
         allowed = INLINE_ALLOW in line or self._path_allowed(path)
+        banked = bank_view(line)
         for rule, rx, false_positive in RULES:
             hard = rule in HARD_RULES
             if allowed and not hard:
                 continue
-            for m in rx.finditer(line):
+            for m in rx.finditer(banked if hard else line):
                 if false_positive and false_positive(m):
                     continue
                 if not hard and any(a.fullmatch(m.group(0)) for a in self.allow_re):
@@ -365,7 +374,18 @@ def _checkout_of(p):
     while not d.exists() and d != d.parent:
         d = d.parent
     common, top = _common_dir(d)
-    return top if common and common == _common_dir(ROOT)[0] else None
+    if not common:
+        return None
+    if common == _common_dir(ROOT)[0] or _is_guarded_checkout(top):
+        return top
+    return None
+
+
+def _is_guarded_checkout(top):
+    """A separate clone of this repo: same guard script and the same Claude hook wiring."""
+    settings = top / ".claude" / "settings.json"
+    return (top / "tools" / "leakguard" / "leakguard.py").is_file() and settings.is_file() \
+        and "leakguard.py" in settings.read_text(errors="ignore")
 
 
 def _inside_root(p):
@@ -441,7 +461,12 @@ def main(argv):
     elif cmd == "candidates" and len(rest) == 2:
         return cmd_candidates(g, *rest)
     elif cmd == "claude-hook":
-        return cmd_claude_hook(g)
+        try:
+            return cmd_claude_hook(g)
+        except Exception:  # fail closed: a crashing guard must not let the write through
+            traceback.print_exc()
+            print("leakguard: hook error, blocking to be safe. Fix the hook or the input.", file=sys.stderr)
+            return 2
     else:
         print(__doc__, file=sys.stderr)
         return 2
