@@ -74,14 +74,29 @@ def _phone_ok(m):
     return not 8 <= sum(c.isdigit() for c in m.group(0)) <= 15
 
 
-def _luhn_ok(m):
-    digits = [int(c) for c in m.group(0) if c.isdigit()]
+def _luhn(digits):
     total = sum(d if i % 2 == 0 else (d * 2 - 9 if d > 4 else d * 2) for i, d in enumerate(reversed(digits)))
-    return total % 10 != 0
+    return total % 10 == 0
+
+
+def _luhn_ok(m):
+    """False positive unless some run of whole digit groups (13-19 digits) passes Luhn: '4111 ... 1111 12/27' is a card."""
+    groups = [[int(c) for c in g] for g in re.split(r"[ .\-_\u00a0]+", m.group(0)) if g]
+    for start in range(len(groups)):
+        digits = []
+        for g in groups[start:]:
+            digits += g
+            if 13 <= len(digits) <= 19 and digits[0] in (2, 3, 4, 5, 6) and _luhn(digits):
+                return False
+    return True
+
+
+def _account_ok(m):
+    return sum(c.isdigit() for c in m.group(0)) < 6
 
 
 def _iban_ok(m):
-    s = m.group(0).replace(" ", "")
+    s = re.sub(r"[ -]", "", m.group(0)).upper()
     s = s[4:] + s[:4]
     return int("".join(str(int(c, 36)) for c in s)) % 97 != 1
 
@@ -100,12 +115,15 @@ RULES = [  # (id, pattern, is_false_positive)
     ("private-key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), None),
     ("age-secret-key", re.compile(r"AGE-SECRET-KEY-1[0-9A-Z]{20,}"), None),
     ("coordinates", re.compile(r"(?<![\w.])-?\d{1,2}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}(?![\w.])"), None),
-    ("iban", re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,3})?\b"), _iban_ok),
-    ("payment-card", re.compile(r"(?<![\d-])[2-6]\d{3}(?:[ -]?\d{4}){2}[ -]?\d{1,7}(?![\d-])"), _luhn_ok),
-    ("bank-account", re.compile(r"(?i)\b(?:iban|bic|swift(?:\s*code)?|sort\s*code|routing\s*(?:number|no)"
-                                r"|account\s*(?:number|no\.?))\s*[:=#-]?\s*(?-i:(?=[A-Z0-9]*\d)[A-Z0-9]{6,})"), None),
+    ("iban", re.compile(r"(?i)\b[A-Z]{2}\d{2}(?:[ -]?[A-Z0-9]{4}){3,7}(?:[ -]?[A-Z0-9]{1,3})?\b"), _iban_ok),
+    ("payment-card", re.compile(r"(?<!\d)[2-6](?:[ .\-_\u00a0]{0,2}\d){12,18}(?!\d)"), _luhn_ok),
+    ("bank-account", re.compile(
+        r"(?i)\b(?:iban|bic|swift(?:[\s_-]*code)?|sort[\s_-]*code|routing[\s_-]*(?:number|no)|aba|acct"
+        r"|account(?:[\s_-]*(?:number|num|no))?|kontonummer|bankkonto|сметка)\b\.?[\"']?\s*(?:(?:[:=#-]|is)\s*){0,2}[\"']?"
+        r"(?-i:(?=[A-Z0-9 .-]*\d)[A-Z0-9][A-Z0-9 .-]{4,32}[A-Z0-9])"), _account_ok),
     ("wifi-secret", re.compile(r"(?i)\b(?:psk|wpa_passphrase|wifi_?pass(?:word)?)\s*[=:]\s*\S+"), None),
 ]
+HARD_RULES = {"payment-card", "iban", "bank-account", "private-key", "age-secret-key"}  # no allowlist, no inline allow
 TOKEN = re.compile(r"[^\s\"'`<>()\[\]{},;=]+")
 SUBTOKEN = re.compile(r"[:/@?&#.+|\\]")
 
@@ -169,13 +187,17 @@ class Guard:
                 for cand in {tok, tok.rstrip(".:!?"), *SUBTOKEN.split(tok)}:
                     if hashlib.sha256(cand.encode()).hexdigest() in self.deny_hash:
                         self._report(where, "denylist#sha256", cand)
-        if deny_only or INLINE_ALLOW in line or self._path_allowed(path):
+        if deny_only:
             return
+        allowed = INLINE_ALLOW in line or self._path_allowed(path)
         for rule, rx, false_positive in RULES:
+            hard = rule in HARD_RULES
+            if allowed and not hard:
+                continue
             for m in rx.finditer(line):
                 if false_positive and false_positive(m):
                     continue
-                if any(a.fullmatch(m.group(0)) for a in self.allow_re):
+                if not hard and any(a.fullmatch(m.group(0)) for a in self.allow_re):
                     continue
                 self._report(where, rule, m.group(0))
 
@@ -289,24 +311,31 @@ def cmd_tree(g):
 
 
 REVIEWED_FILE = ROOT / ".leakguard-reviewed"
-CANDIDATE = re.compile(r"(?<![\w@./-])(?:[A-Z][a-z]+(?:[A-Z][a-z]+)*|[\u0400-\u04FF]{3,})(?![\w])|\b\d{4,}\b|@[\w.-]{3,}")
+WORD = re.compile(r"(?<![\w@./-])[^\W\d_][^\W_]*(?:['-][^\W\d_]+)*")
+NUMBERISH = re.compile(r"\b\d{4,}\b|@[\w.-]{3,}")
 
 
 def cmd_candidates(g, base, head):
-    """List terms from added lines that a human should classify: proper-noun-like words never seen in lowercase
-    in the repo, Cyrillic words, long numbers, handles. Skips terms already in .leakguard-reviewed."""
+    """List terms from a range that a human should classify: capitalised or all-caps words (any script) never seen
+    in lowercase in the base tree, long numbers and handles, from added lines, commit messages and file names.
+    Skips terms already in .leakguard-reviewed."""
     rng = head if base == "--root" else f"{base}..{head}"
-    added = [l[1:] for l in git("log", "-p", *DIFF, "--format=%B", rng).splitlines()
+    texts = [l[1:] for l in git("log", "-p", *DIFF, "--diff-merges=first-parent", "--format=", rng).splitlines()
              if l.startswith("+") and not l.startswith("+++")]
-    corpus = set(re.findall(r"\b[a-z][a-z]+\b", " ".join(
-        (ROOT / p).read_text(errors="ignore") for p in git("ls-files").splitlines()
-        if (ROOT / p).is_file() and Path(p).suffix.lower() not in OPAQUE_EXT)))
+    texts += git("log", "--format=%B", rng).splitlines()
+    texts += git("log", "--format=", "--name-only", "--diff-merges=first-parent", rng).splitlines()
+    corpus = set()
+    if base != "--root":  # what the repo already says in lowercase is ordinary vocabulary
+        for path in git("ls-tree", "-r", "--name-only", base).splitlines():
+            if Path(path).suffix.lower() not in OPAQUE_EXT:
+                corpus.update(re.findall(r"\b[^\W\d_]+\b", git("show", f"{base}:{path}").lower()))
     reviewed = set()
     if REVIEWED_FILE.is_file():
         reviewed = {l.strip().casefold() for l in REVIEWED_FILE.read_text().splitlines() if l.strip() and l[0] != "#"}
     counts = {}
-    for line in added:
-        for term in CANDIDATE.findall(line):
+    for line in texts:
+        terms = [w for w in WORD.findall(line) if w[0].isupper() and len(w) > 2] + NUMBERISH.findall(line)
+        for term in terms:
             if term.casefold() in reviewed or term.lower() in corpus:
                 continue
             counts[term] = counts.get(term, 0) + 1
@@ -315,12 +344,32 @@ def cmd_candidates(g, base, head):
     return 0
 
 
-def _inside_root(p):
+def _common_dir(d):
     try:
-        Path(p).resolve().relative_to(ROOT)
-        return True
-    except (ValueError, OSError):
-        return False
+        out = subprocess.run(["git", "-C", str(d), "rev-parse", "--path-format=absolute", "--git-common-dir",
+                              "--show-toplevel"], capture_output=True, text=True, check=True).stdout.split("\n")
+        return Path(out[0]).resolve(), Path(out[1]).resolve()
+    except (subprocess.CalledProcessError, FileNotFoundError, NotADirectoryError, IndexError):
+        return None, None
+
+
+def _checkout_of(p):
+    """Toplevel of the checkout (main or any worktree of this repo) that contains p, else None."""
+    path = Path(p).expanduser().resolve()
+    try:
+        path.relative_to(ROOT)
+        return ROOT
+    except ValueError:
+        pass
+    d = path if path.is_dir() else path.parent
+    while not d.exists() and d != d.parent:
+        d = d.parent
+    common, top = _common_dir(d)
+    return top if common and common == _common_dir(ROOT)[0] else None
+
+
+def _inside_root(p):
+    return _checkout_of(p) is not None
 
 
 PUBLISHING = re.compile(r"\bgh\s+(?:pr|issue|release|gist|api|repo)\b|\bgit\b[^|;&]*?\s(?:commit|tag|notes|push)\b")
@@ -333,10 +382,11 @@ def cmd_claude_hook(g):
     tool, ti = data.get("tool_name", ""), data.get("tool_input") or {}
     if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
         fp = ti.get("file_path") or ti.get("notebook_path") or ""
-        if not _inside_root(fp):
+        top = _checkout_of(fp) if fp else None
+        if top is None:
             return 0
-        rel = str(Path(fp).resolve().relative_to(ROOT))
-        if subprocess.run(["git", "check-ignore", "-q", rel], cwd=ROOT).returncode == 0:
+        rel = str(Path(fp).expanduser().resolve().relative_to(top))
+        if subprocess.run(["git", "check-ignore", "-q", rel], cwd=top).returncode == 0:
             return 0  # ignored files never reach the remote
         g.scan_line(f"{rel} (path)", rel, rel)
         parts = [ti.get("content"), ti.get("new_string"), ti.get("new_source")]

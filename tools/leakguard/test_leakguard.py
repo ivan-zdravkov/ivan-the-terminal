@@ -71,6 +71,21 @@ class GenericRules(unittest.TestCase):
         self.assertNotIn("payment-card", rules_hit(J(["4111 ", "1111 1111 1112"])))
         self.assertIn("bank-account", rules_hit("IBAN: " + J(["BG80", "BNBG96611020345678"])))
         self.assertEqual(set(), rules_hit("IBANs and account numbers are blocked, a BIC with an account too"))
+        card = J(["4111 ", "1111 1111 1111"])
+        for text in (card + " 12/27 123", card.replace(" ", "."), card.replace(" ", "_"), J(["3782 ", "822463 10005"])):
+            self.assertIn("payment-card", rules_hit(text), text)
+        n8, n9 = J(["1234", "5678"]), J(["0210", "00021"])
+        for text in (f"account_number: {n8}", f'"accountNumber": "{n8}"', f"Account #: {n8}",
+                     "Sort code: " + J(["12-", "34-56"]), f"ABA {n9}", f"Kontonummer: {n8}90"):
+            self.assertIn("bank-account", rules_hit(text), text)
+        for text in (J(["gb82", "west12345698765432"]), J(["GB82-", "WEST-1234-5698-7654-32"])):
+            self.assertIn("iban", rules_hit(text), text)
+        for text in ("my GitHub account: some-user", "account settings 2FA", "Account 1 of 3", "2026-10-22 10:15:00"):
+            self.assertEqual(set(), rules_hit(text), text)
+
+    def test_bank_rules_ignore_allowlists(self):
+        card = J(["4111 ", "1111 1111 1111"])
+        self.assertIn("payment-card", rules_hit(card + " # leakguard" + ":allow"))
 
     def test_inline_allow(self):
         line = ".".join(["10", "0", "0", "1"]) + "  # leakguard" + ":allow"
@@ -208,6 +223,16 @@ class GitBypasses(unittest.TestCase):
         terms = {line.split("\t")[1] for line in out.getvalue().splitlines()}
         self.assertTrue({"Zorbalina", "Placeholderton"} <= terms)
         self.assertNotIn("club", terms)
+
+    def test_hook_covers_worktrees(self):
+        wt = Path(self.tmp.name + "-wt")
+        self.git("worktree", "add", "-q", "-b", "wt", str(wt))
+        try:
+            payload = {"tool_name": "Write", "tool_input": {"file_path": str(wt / "x.md"), "content": self.NAME}}
+            with mock.patch("sys.stdin", io.StringIO(json.dumps(payload))), redirect_stderr(io.StringIO()):
+                self.assertEqual(2, leakguard.cmd_claude_hook(leakguard.Guard()))
+        finally:
+            self.git("worktree", "remove", "--force", str(wt))
 
     def test_documents_are_rejected(self):
         (self.repo / "cv.pdf").write_bytes(b"%PDF-1.7 clean")
