@@ -1,3 +1,5 @@
 # Generic-rule exceptions (regex, full match). The private denylist can never be bypassed.
 # path:<glob> skips generic rules for matching files.
 ivan@zdravkov\.dev
+# LinkedIn system senders (public, identical for every user; the job digest filters on them)
+(?:inmail-hit-reply|messaging-digest-noreply|jobalerts-noreply|jobs-listings|jobs-noreply)@linkedin\.com

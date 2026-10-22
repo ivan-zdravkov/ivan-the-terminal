@@ -14,7 +14,7 @@ Pushing a branch publishes it: PR refs stay public even after a squash merge. So
    - Private: `~/Repositories/ivan-the-terrible/bin/denylist-add "<term>"`, then `bin/sync-denylist`, then fix the content.
    - Public: append to `.leakguard-reviewed` so it's never asked again.
    - Bank details are never public. Don't even ask; remove them.
-5. **Gate:** `itt ship-check`. It must end with `ship-check: clean`. On findings, fix the content; don't allowlist it unless it's truly generic, like a documentation IP.
+5. **Gate:** `itt ship-check`. It must end with `ship-check: clean`. On findings, fix the content; don't allowlist it unless it's truly generic, like a documentation IP. CI reads `.leakguard-allow` from the base branch, so a new allowlist entry ships in its own small PR first.
 6. **Review:** run the `/security-review` skill on the branch and fix anything real. If you changed anything, repeat 3–5.
 7. **Push:** `git push -u origin HEAD`. The pre-push hook re-scans.
 8. **PR:** `gh pr create --title "<conventional title>" --body-file <tmp>`. The body covers what and why, plus a `Security:` line with the interview, ship-check and security-review results. The PR text is public and scanned too.
