@@ -44,9 +44,12 @@ def _root():
 
 ROOT = _root()
 CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "ivan-the-terminal"
-ALLOW_FILE = ROOT / ".leakguard-allow"
+ALLOW_FILE = Path(os.environ.get("LEAKGUARD_ALLOW_FILE") or ROOT / ".leakguard-allow")  # CI pins the base branch copy
 INLINE_ALLOW = "leakguard:allow"
-IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff"}
+IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff", ".avif", ".dng"}
+MEDIA_EXT = {".mov", ".mp4", ".m4v", ".3gp", ".avi", ".mkv"}  # phone videos carry GPS
+DOC_EXT = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp"}  # author metadata, hidden text
+OPAQUE_EXT = IMAGE_EXT | MEDIA_EXT | DOC_EXT
 
 SAFE_NETS = [ipaddress.ip_network(n) for n in (
     "0.0.0.0/32", "127.0.0.0/8", "255.255.255.255/32",
@@ -94,6 +97,7 @@ RULES = [  # (id, pattern, is_false_positive)
     ("wifi-secret", re.compile(r"(?i)\b(?:psk|wpa_passphrase|wifi_?pass(?:word)?)\s*[=:]\s*\S+"), None),
 ]
 TOKEN = re.compile(r"[^\s\"'`<>()\[\]{},;=]+")
+SUBTOKEN = re.compile(r"[:/@?&#.+|\\]")
 
 
 class Guard:
@@ -146,16 +150,16 @@ class Guard:
     def _report(self, where, rule, match):
         self.findings.append(f"{where}: {rule}: {'[redacted]' if self.redact else match}")
 
-    def scan_line(self, where, line, path=""):
+    def scan_line(self, where, line, path="", deny_only=False):
         for n, rx in self.deny_plain:
             for m in rx.finditer(line):
                 self._report(where, f"denylist#{n}", m.group(0))
         if self.deny_hash:
             for tok in TOKEN.findall(line):
-                for cand in {tok, tok.rstrip(".:!?")}:
+                for cand in {tok, tok.rstrip(".:!?"), *SUBTOKEN.split(tok)}:
                     if hashlib.sha256(cand.encode()).hexdigest() in self.deny_hash:
                         self._report(where, "denylist#sha256", cand)
-        if INLINE_ALLOW in line or any(fnmatch.fnmatch(path, g) for g in self.allow_paths):
+        if deny_only or INLINE_ALLOW in line or self._path_allowed(path):
             return
         for rule, rx, false_positive in RULES:
             for m in rx.finditer(line):
@@ -165,20 +169,35 @@ class Guard:
                     continue
                 self._report(where, rule, m.group(0))
 
-    def scan_text(self, label, text, path=""):
-        for i, line in enumerate(text.splitlines(), 1):
-            self.scan_line(f"{label}:{i}", line, path)
+    def _path_allowed(self, path):
+        return any(fnmatch.fnmatch(path, g) for g in self.allow_paths)
 
-    def scan_blob(self, path, data):
-        self.scan_line(f"{path} (path)", path, path)
-        if Path(path).suffix.lower() in IMAGE_EXT and _has_metadata(data):
-            self._report(path, "image-metadata", "EXIF present; strip it: exiftool -all= FILE")
-        if b"\0" in data[:8192]:
-            return
-        self.scan_text(path, data.decode("utf-8", "replace"), path)
+    def scan_text(self, label, text, path="", deny_only=False):
+        for i, line in enumerate(text.splitlines(), 1):
+            self.scan_line(f"{label}:{i}", line, path, deny_only)
+
+    def scan_blob(self, path, data, where=None, content=True):
+        """Scan a file's name and bytes. content=False: only checks a text diff can't see (binary, encodings)."""
+        where = where or path
+        self.scan_line(f"{where} (path)", path, path)
+        ext = Path(path).suffix.lower()
+        if not self._path_allowed(path):
+            if ext in DOC_EXT:
+                self._report(where, "document-file", "office/PDF files carry metadata; publish Markdown instead")
+            elif ext in MEDIA_EXT:
+                self._report(where, "media-file", "videos carry GPS/device metadata; strip it and allowlist the path")
+            elif ext in IMAGE_EXT and _has_metadata(data):
+                self._report(where, "image-metadata", "EXIF/XMP present; strip it: exiftool -all= FILE")
+        if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+            self.scan_text(where, data.decode("utf-16", "replace"), path)
+        elif b"\0" in data[:8192] or ext in OPAQUE_EXT:
+            strings = b"\n".join(re.findall(rb"[\x20-\x7e]{4,}", data)).decode()
+            self.scan_text(where, strings, path, deny_only=True)
+        elif content:
+            self.scan_text(where, data.decode("utf-8", "replace"), path)
 
     def scan_patch(self, patch, prefix=""):
-        """Scan only added lines of a unified diff (git diff -U0 / git log -p)."""
+        """Scan added lines of a unified diff (git diff -a -U0 / git log -p). Binary lines are left to scan_blob."""
         path, lineno, header = None, 0, False
         for raw in patch.splitlines():
             if raw.startswith("commit:"):
@@ -193,7 +212,8 @@ class Guard:
             elif raw.startswith("@@"):
                 header = False
                 lineno = int(re.search(r"\+(\d+)", raw).group(1))
-            elif path and not header and raw.startswith("+"):
+            elif path and not header and raw.startswith("+") and "\0" not in raw \
+                    and Path(path).suffix.lower() not in OPAQUE_EXT:
                 self.scan_line(f"{prefix}{path}:{lineno}", raw[1:], path)
                 lineno += 1
 
@@ -212,6 +232,8 @@ class Guard:
 def _has_metadata(data):
     if data[:2] == b"\xff\xd8":
         return b"Exif\0\0" in data[:65536]
+    if b"<x:xmpmeta" in data or b"GPSLatitude" in data:
+        return True
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         return b"eXIf" in data or b"iTXt" in data and b"exif" in data.lower()
     return b"Exif" in data[:65536] or b"EXIF" in data[:65536]
@@ -223,25 +245,31 @@ def git(*args, binary=False):
     return out if binary else out.decode("utf-8", "replace")
 
 
+# --text defeats `-diff`/`binary` gitattributes; first-parent diffs make merge commits visible.
+DIFF = ("-U0", "--text", "--no-color", "--no-ext-diff", "--no-textconv", "-M", "--diff-filter=ACMRT")
+
+
 def cmd_staged(g):
-    g.scan_patch(git("diff", "--cached", "-U0", "--no-color", "--no-ext-diff", "--diff-filter=ACMR"))
-    for path in git("diff", "--cached", "--name-only", "--diff-filter=ACMR").splitlines():
-        if Path(path).suffix.lower() in IMAGE_EXT and _has_metadata(git("show", f":{path}", binary=True)):
-            g._report(path, "image-metadata", "EXIF present; strip it: exiftool -all= FILE")
+    g.scan_patch(git("diff", "--cached", *DIFF))
+    for path in git("diff", "--cached", "--name-only", "-M", "--diff-filter=ACMRT", "-z").split("\0"):
+        if path:  # names of renames/copies/mode changes have no +++ line; binary content has no text diff
+            g.scan_blob(path, git("show", f":{path}", binary=True), content=False)
 
 
 def cmd_range(g, base, head):
     rng = head if base == "--root" else f"{base}..{head}"
-    g.scan_patch(git("log", "-p", "-U0", "--no-color", "--no-ext-diff", "--format=commit:%H", rng))
+    g.scan_patch(git("log", "-p", *DIFF, "--diff-merges=first-parent", "--format=commit:%H", rng))
     for block in git("log", "--format=%H%x00%B%x01", rng).split("\x01"):
         if "\0" in block:
             sha, msg = block.strip("\n").split("\0", 1)
             g.scan_text(f"{sha[:8]} (message)", msg)
-    for sha in git("rev-list", rng).split():
-        for path in git("diff-tree", "--no-commit-id", "-r", "--name-only", "--diff-filter=AM", sha).splitlines():
-            if Path(path).suffix.lower() in IMAGE_EXT:
-                if _has_metadata(git("cat-file", "blob", f"{sha}:{path}", binary=True)):
-                    g._report(f"{sha[:8]}:{path}", "image-metadata", "EXIF present")
+    sha = None
+    for line in git("log", "--name-only", "-M", "--diff-filter=ACMRT", "--diff-merges=first-parent",
+                    "--format=commit:%H", rng).splitlines():
+        if line.startswith("commit:"):
+            sha = line[7:]
+        elif line and sha:
+            g.scan_blob(line, git("cat-file", "blob", f"{sha}:{line}", binary=True), f"{sha[:8]}:{line}", content=False)
 
 
 def cmd_tree(g):
@@ -258,7 +286,8 @@ def _inside_root(p):
         return False
 
 
-PUBLISHING = re.compile(r"\bgh\s+(?:pr|issue|release|gist|api|repo)\b|\bgit\s+(?:commit|tag|notes)\b")
+PUBLISHING = re.compile(r"\bgh\s+(?:pr|issue|release|gist|api|repo)\b|\bgit\b[^|;&]*?\s(?:commit|tag|notes|push)\b")
+NO_VERIFY = re.compile(r"(?:^|\s)-[a-zA-Z]*n[a-zA-Z]*(?=\s|$)")  # git commit -n == --no-verify
 
 
 def cmd_claude_hook(g):
@@ -282,13 +311,24 @@ def cmd_claude_hook(g):
         if not PUBLISHING.search(cmd) or not (_inside_root(data.get("cwd", "")) or ROOT.name in cmd):
             return 0
         g.scan_text("command", cmd)
+        git_cmd = re.search(r"\bgit\b[^|;&]*?\s(commit|push)\b([^|;&]*)", cmd)
+        if git_cmd and ("--no-verify" in git_cmd.group(2)
+                        or git_cmd.group(1) == "commit" and NO_VERIFY.search(git_cmd.group(2))):
+            g._report("command", "hook-bypass", "--no-verify / -n skips the leak gates")
         try:
             words = shlex.split(cmd)
         except ValueError:
-            words = []
-        for flag, value in zip(words, words[1:]):
-            if flag in ("--body-file", "-F", "--file") and Path(value).is_file():
-                g.scan_text(value, Path(value).read_text(encoding="utf-8", errors="replace"))
+            words = cmd.split()
+        base = Path(data.get("cwd") or ".")
+        # Any file the command could upload: --body-file=F, --notes-file F, gist F, "$(cat F)".
+        for word in {part for w in words for part in w.split()}:
+            value = word.split("=", 1)[1] if word.startswith("-") and "=" in word else word
+            value = value.strip("()$<>'\"`")
+            if not value or value.startswith("-"):
+                continue
+            f = (base / value).expanduser()
+            if f.is_file() and f.stat().st_size < 1_000_000:
+                g.scan_text(value, f.read_text(encoding="utf-8", errors="replace"))
     return g.done(code=2)
 
 

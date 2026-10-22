@@ -27,8 +27,13 @@ Placeholders: `~` / `$HOME` for paths, `192.0.2.0/24` (RFC 5737) for IPs, `examp
 | The denylist itself leaking | it lives only in the private repo and an encrypted Actions secret. Secrets in it are sha256 hashes, and CI output is redacted |
 | Compromised CI dependency | actions pinned by commit SHA, gitleaks binary checksum-verified, `contents: read` token, Dependabot for updates |
 | Direct pushes / force pushes to `main` | branch protection (admins included), linear history, local pre-push refusal |
+| A PR neutering its own guard (edits leakguard, allowlist or gitleaks config) | CI runs leakguard, `.leakguard-allow` and `.gitleaks.toml` from the **base branch**, and ignores PR-supplied `.gitleaksignore` |
+| Fork PRs (no access to the denylist secret) | workflows need approval for outside contributors; fork PRs are reviewed and merged by hand (auto-merge is only for my own branches); the push to `main` re-scans against the denylist |
+| Hidden content: renames, binary/UTF-16 files, `-diff` attributes, merge commits | leakguard scans file names, forces text diffs, decodes UTF-16, extracts strings from binaries for the denylist, and diffs merges against the first parent |
+| Office/PDF/video files (author, GPS and device metadata) | rejected by default; publish Markdown, or strip metadata and allowlist the path |
+| Hook bypass by Claude | the Claude hook blocks `git commit/push --no-verify` and `git commit -n`, and scans every file a `gh` command could upload |
 
-Known limits: leakguard is pattern-based. It can't recognise a personal fact that isn't on the denylist, like a new club name. So `/security-review` and a human read remain part of the flow. It doesn't parse IPv6 beyond Tailscale's range.
+Known limits: leakguard is pattern-based. It can't recognise a personal fact that isn't on the denylist, like a new club name. So `/security-review` and a human read remain part of the flow. Hashed denylist entries match exact (sub)tokens, case-sensitively. IPv6 isn't parsed beyond Tailscale's range.
 
 ## If something leaks
 

@@ -10,7 +10,8 @@ permissions:
 
 concurrency:
   group: guard-${{ github.ref }}
-  cancel-in-progress: true
+  # never cancel runs on main: each push scans only its own commits
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   leakguard:
@@ -26,10 +27,18 @@ jobs:
           SAME_REPO: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          lg=(python3 -I tools/leakguard/leakguard.py --redact)
+          # Run the guard and allowlist from the base branch so a PR can't neuter its own check.
+          src=tools/leakguard/leakguard.py
+          if [ -n "$PR_BASE" ] && git show "$PR_BASE:$src" > "$RUNNER_TEMP/leakguard.py" 2>/dev/null; then
+            src="$RUNNER_TEMP/leakguard.py"
+            git show "$PR_BASE:.leakguard-allow" > "$RUNNER_TEMP/allow" 2>/dev/null || : > "$RUNNER_TEMP/allow"
+            export LEAKGUARD_ALLOW_FILE="$RUNNER_TEMP/allow"
+          fi
+          lg=(python3 -I "$src" --redact)
           # Forks get no secrets; our own branches must always be checked against the denylist.
           if [ "$SAME_REPO" = true ]; then lg+=(--require-denylist); fi
           "${lg[@]}" tree
@@ -53,8 +62,16 @@ jobs:
           curl -sSfLo gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
           echo "${SHA256}  gitleaks.tgz" | sha256sum -c -
           tar -xzf gitleaks.tgz gitleaks
-      - name: Scan full history
-        run: '"$RUNNER_TEMP/gitleaks" git --redact --no-banner -v .'
+      - name: Scan full history (base-branch config; PR-supplied ignores disregarded)
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          cfg="$RUNNER_TEMP/gitleaks.toml"
+          if [ -z "$PR_BASE" ] || ! git show "$PR_BASE:.gitleaks.toml" > "$cfg" 2>/dev/null; then
+            printf '[extend]\nuseDefault = true\n' > "$cfg"
+          fi
+          : > "$RUNNER_TEMP/gitleaksignore"
+          "$RUNNER_TEMP/gitleaks" git --config "$cfg" --gitleaks-ignore-path "$RUNNER_TEMP/gitleaksignore" --redact --no-banner -v .
 
   tests:
     runs-on: ubuntu-latest
