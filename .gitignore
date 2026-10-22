@@ -1,0 +1,24 @@
+# Private overlay and local-only files never belong here
+CLAUDE.local.md
+.claude/settings.local.json
+*.local.*
+*.local
+.env
+.env.*
+!.env.example
+secrets/
+*.age
+*.key
+*.pem
+id_*
+!*.example
+
+# Python / tooling
+__pycache__/
+*.pyc
+.venv/
+
+# OS / editors
+.DS_Store
+*.swp
+*~
