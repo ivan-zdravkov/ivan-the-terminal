@@ -14,6 +14,12 @@
       "source": "./plugins/foundation",
       "description": "Setup, health checks and safe publishing: doctor, new-machine bootstrap, and a leak-guarded ship-public flow.",
       "category": "productivity"
+    },
+    {
+      "name": "homelab",
+      "source": "./plugins/homelab",
+      "description": "Keep a Linux home machine healthy: daily health check with notifications (updates, disks, SMART, mounts, services, containers, tailnet) and guided system updates.",
+      "category": "productivity"
     }
   ]
 }

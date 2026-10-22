@@ -17,6 +17,6 @@ base=$(git merge-base HEAD origin/main 2>/dev/null || echo --root)
 gitleaks git --redact --no-banner --log-level warn .
 python3 -I -m unittest discover -q -s tools/leakguard 2>&1 | tail -1
 python3 -I tools/lint_skills.py
-shellcheck -x bin/* .githooks/* shell/*
+shellcheck -x bin/* .githooks/* shell/* plugins/*/skills/*/scripts/run
 if [ "$base" = --root ]; then n=$(git rev-list --count HEAD); else n=$(git rev-list --count "$base..HEAD"); fi
 echo "ship-check: clean ($n commit(s) checked)"

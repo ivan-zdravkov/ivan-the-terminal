@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily homelab health check (notifies on problems)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/itt run homelab-check --notify
+Environment=PATH=%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+SuccessExitStatus=1

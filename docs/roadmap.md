@@ -5,7 +5,7 @@ Skills distilled from months of real sessions, each turned generic here with per
 | Plugin | Skills (planned) | Replaces |
 |---|---|---|
 | **foundation** ✅ | doctor, new-machine, ship-public, kaizen | manual setup notes |
-| **homelab** | os-updates (rpm-ostree, flatpak, brew, firmware), drive-health (dirty NTFS / mount recovery), wake-and-power (WoL, idle draw), tailnet-health, service-watch (systemd units and timers), tv-tune (Android TV over ADB) | vendor apps, "smart" hubs |
+| **homelab** ✅ | homelab-check (OS, apps, firmware, disks, SMART, mounts, services, containers, tailnet; daily notify) ✅, system-updates ✅ · next: wake-and-power (WoL, idle draw), tv-tune (Android TV over ADB) | vendor apps, "smart" hubs, uptime SaaS |
 | **retro** | rom-library (redump naming, CHD/RVZ conversion, region/60 Hz swaps, m3u), device-sync (PC ⇄ handheld/tablet over MTP/ADB), emulator-patches, lutris-import (+ SteamGridDB art), game-streaming (Sunshine/Polaris + Moonlight over LAN/Tailscale), handheld-cfw notes | cloud gaming subscriptions |
 | **career** | job-digest (headless Claude on a timer: inbox triage, shortlist, reply drafts behind a send guard), outreach drafts, profile writing | job-board premium tiers |
 | **inbox** | triage and unsubscribe sweeps | mail "assistants" |

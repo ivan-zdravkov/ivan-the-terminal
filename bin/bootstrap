@@ -37,6 +37,16 @@ for s in "$ITT_HOME"/plugins/*/skills/*/; do
   [ -f "$s/SKILL.md" ] && link "${s%/}" "$HOME/.claude/skills/$(basename "$s")"
 done
 
+say "plugin timers (systemd --user)"
+for unit in "$ITT_HOME"/plugins/*/systemd/*.service "$ITT_HOME"/plugins/*/systemd/*.timer; do
+  [ -e "$unit" ] || continue
+  [ "$(readlink -f "$CFG/systemd/user/$(basename "$unit")")" = "$unit" ] || systemctl --user link "$unit" >/dev/null
+done
+systemctl --user daemon-reload
+for timer in "$ITT_HOME"/plugins/*/systemd/*.timer; do
+  [ -e "$timer" ] && systemctl --user enable --now "$(basename "$timer")" >/dev/null 2>&1
+done
+
 say "private overlay"
 if [ ! -d "$PRIVATE_DIR/.git" ]; then
   repo="${ITT_PRIVATE_REPO:-$(gh api user -q .login 2>/dev/null || echo unknown)/ivan-the-terrible}"
