@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# fetch URL NAME: GET a plain https URL into the digest work dir. The headless run's only way to download.
+set -euo pipefail
+WORK="${JOB_DIGEST_WORK:?JOB_DIGEST_WORK not set}"
+[ $# -eq 2 ] || { echo "usage: fetch URL NAME" >&2; exit 2; }
+url=$1 name=$2
+[[ "$url" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[^[:space:]]*)?$ ]] || { echo "fetch: only plain https URLs" >&2; exit 2; }
+[[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$ ]] || { echo "fetch: NAME must be a plain file name" >&2; exit 2; }
+curl -sSL --proto =https --proto-redir =https -m 20 -A Mozilla/5.0 --max-filesize 20000000 -o "$WORK/$name" -- "$url"
+echo "saved $name ($(wc -c < "$WORK/$name") bytes)"
