@@ -69,6 +69,11 @@ for timer in "$ITT_HOME"/plugins/*/systemd/*.timer; do
   systemctl --user is-enabled -q "$(basename "$timer")" 2>/dev/null && r ok "timer:$(basename "$timer" .timer)" "" \
     || r warn "timer:$(basename "$timer" .timer)" "not enabled: itt bootstrap"
 done
+for svc in "$ITT_HOME"/plugins/*/systemd/*.service; do
+  grep -q '^\[Install\]' "$svc" 2>/dev/null || continue
+  systemctl --user is-active -q "$(basename "$svc")" 2>/dev/null && r ok "service:$(basename "$svc" .service)" "" \
+    || r warn "service:$(basename "$svc" .service)" "not running: itt bootstrap, then systemctl --user status $(basename "$svc")"
+done
 
 # --- GitHub-side protection (skipped offline)
 slug=$(git -C "$ITT_HOME" remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')

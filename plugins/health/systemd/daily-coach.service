@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily coach: make and email today's plan (Claude Code, headless) if there is none yet
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/itt run daily-coach --if-missing
+Environment=PATH=%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+TimeoutStartSec=20min

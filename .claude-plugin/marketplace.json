@@ -32,6 +32,12 @@
       "source": "./plugins/retro",
       "description": "Emulation library care: audit, CHD/RVZ conversion, multi-disc playlists, 50 Hz detection, and device sync over adb or to SD cards.",
       "category": "entertainment"
+    },
+    {
+      "name": "health",
+      "source": "./plugins/health",
+      "description": "Daily health coach: ring/Apple Health data in, a tiny gamified plan out (exercise snacks, seasonal recipe, sleep), phone check-ins with XP and trends.",
+      "category": "health"
     }
   ]
 }

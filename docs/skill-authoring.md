@@ -9,6 +9,6 @@ Goal: skills that trigger reliably, cost few tokens and never leak.
 5. **Generic + overlay.** Never hard-code personal values. Read `~/.config/ivan-the-terminal/<skill>.*`, ship a `config.example`, and fail with a clear message when config is missing.
 6. **Secrets via sops only.** Use `sops exec-env`. Never put secrets in args, logs or output.
 7. **Idempotent and safe.** Re-running is harmless. Destructive steps confirm or dry-run first. Interactive or sudo steps are handed to the user as an exact command.
-8. **Headless-ready.** If it can run on a timer, declare the minimal tool allowlist, a guard hook for outbound actions, and log to `~/.local/state/ivan-the-terminal/<skill>/`.
+8. **Headless-ready.** If it can run on a timer, declare the minimal tool allowlist, a guard hook for outbound actions, and log to `~/.local/state/ivan-the-terminal/<skill>/`. File writes are allowed with `Edit(//abs/path/**)` rules (they cover Write too); `Write(...)` allow rules are silently ignored.
 9. **Replace something.** Note which paid or enshittified service the skill makes unnecessary.
 10. **Ship through `ship-public`.**

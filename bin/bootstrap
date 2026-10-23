@@ -37,14 +37,17 @@ for s in "$ITT_HOME"/plugins/*/skills/*/; do
   [ -f "$s/SKILL.md" ] && link "${s%/}" "$HOME/.claude/skills/$(basename "$s")"
 done
 
-say "plugin timers (systemd --user)"
+say "plugin timers and services (systemd --user)"
 for unit in "$ITT_HOME"/plugins/*/systemd/*.service "$ITT_HOME"/plugins/*/systemd/*.timer; do
   [ -e "$unit" ] || continue
   [ "$(readlink -f "$CFG/systemd/user/$(basename "$unit")")" = "$unit" ] || systemctl --user link "$unit" >/dev/null
 done
 systemctl --user daemon-reload
-for timer in "$ITT_HOME"/plugins/*/systemd/*.timer; do
-  [ -e "$timer" ] && systemctl --user enable --now "$(basename "$timer")" >/dev/null 2>&1
+# Timers, and long-running services that declare [Install]; oneshot services are started by their timers.
+for unit in "$ITT_HOME"/plugins/*/systemd/*.timer "$ITT_HOME"/plugins/*/systemd/*.service; do
+  [ -e "$unit" ] || continue
+  case "$unit" in *.service) grep -q '^\[Install\]' "$unit" || continue ;; esac
+  systemctl --user enable --now "$(basename "$unit")" >/dev/null 2>&1
 done
 
 say "private overlay"
