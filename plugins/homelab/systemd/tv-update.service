@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly TV app updates over adb (Stremio, SmartTube, Tailscale)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/itt run tv update --weekly --notify
+Environment=PATH=%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+SuccessExitStatus=1

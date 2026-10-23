@@ -18,7 +18,7 @@
     {
       "name": "homelab",
       "source": "./plugins/homelab",
-      "description": "Keep a Linux home machine healthy: daily health check with notifications (updates, disks, SMART, mounts, services, containers, tailnet) and guided system updates.",
+      "description": "Keep a Linux home machine healthy: daily health check with notifications (updates, disks, SMART, mounts, services, containers, tailnet) and guided system updates, and an Android TV kept current over adb (Stremio, SmartTube, Tailscale).",
       "category": "productivity"
     },
     {
