@@ -10,7 +10,7 @@ Config: `~/.config/ivan-the-terminal/tv.conf` (template: `config.example`). The 
 
 - `itt run tv status` shows outdated or missing apps and settings drift (problems only; `-v` shows all).
 - `itt run tv update [app...]` installs missing apps and updates outdated ones (`--dry-run` to preview). Checksums are verified when the source publishes them (SmartTube, Tailscale).
-- `itt run tv setup` (idempotent) gives the boot helper its permissions and makes Tailscale the always-on VPN.
+- `itt run tv setup` (idempotent) gives the boot helper its permissions, makes Tailscale the always-on VPN, and keeps the `DISABLE` stock apps disabled (stock YouTube, so links open in SmartTube; undo with `adb shell pm enable <pkg>`).
 - `itt run tv connect` connects adb. It falls back to mDNS when the TV's IP changed; then update `TV_ADB`.
 
 The weekly update runs from `tv-update.timer`: it fires daily, but works at most once per `WEEKLY_DAYS`, so it retries while the TV is off. It skips an app that is open on screen and notifies on problems. Its last result is in `~/.local/state/ivan-the-terminal/tv/last.txt`.

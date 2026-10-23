@@ -3,4 +3,5 @@ TV_ADB="192.0.2.20:5555"   # adb-over-Wi-Fi address (reserve it in the router); 
 APPS="stremio stremio-boot smarttube tailscale"   # any of: stremio stremio-boot smarttube tailscale
 AUTOSTART="stremio"        # app opened when the TV boots (needs its -boot helper in APPS); empty = off
 ALWAYS_ON_VPN="tailscale"  # VPN started at boot, so DNS goes through the tailnet; empty = off
+DISABLE="com.google.android.youtube.tv"   # stock apps to keep disabled (YouTube links then open in SmartTube); undo: adb shell pm enable <pkg>
 WEEKLY_DAYS=7              # `update --weekly` (the timer) runs at most this often
