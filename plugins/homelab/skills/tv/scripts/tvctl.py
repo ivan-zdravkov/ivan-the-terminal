@@ -4,7 +4,7 @@
   tvctl.py status [--json]                     apps (installed vs latest), autostart, always-on VPN
   tvctl.py update [APP...] [--dry-run]         install missing / update outdated apps from their official sources
               [--weekly] [--notify]            timer mode: at most once per WEEKLY_DAYS, skip apps in use, notify
-  tvctl.py setup                               autostart app on boot, always-on VPN (idempotent)
+  tvctl.py setup                               autostart app on boot, always-on VPN, disabled stock apps (idempotent)
   tvctl.py connect                             adb connect (TV_ADB, else mDNS discovery)
 
 Config: ~/.config/ivan-the-terminal/tv.conf (template: ../config.example). Stdlib only.
@@ -89,7 +89,7 @@ BOOT_HELPERS = {"stremio": ("com.stremio.tv.launcher", "com.stremio.tv.launcher/
 
 def load_conf():
     conf = {"TV_ADB": "", "APPS": "stremio stremio-boot smarttube tailscale",
-            "AUTOSTART": "stremio", "ALWAYS_ON_VPN": "tailscale", "WEEKLY_DAYS": "7"}
+            "AUTOSTART": "stremio", "ALWAYS_ON_VPN": "tailscale", "DISABLE": "", "WEEKLY_DAYS": "7"}
     if CONF.is_file():
         for line in CONF.read_text().splitlines():
             line = line.strip()
@@ -223,6 +223,16 @@ def setup_checks(tv, conf, apply):
             yield "warn", "vpn", f"{vpn} not connected: log in on the TV (open the app, scan the QR code)"
         else:
             yield "ok", "vpn", f"{vpn} always-on and connected"
+    # Stock apps to keep disabled (firmware and Play Store updates can re-enable them); `pm enable` undoes it.
+    disabled = set(re.findall(r"package:(\S+)", tv.sh("pm list packages -d")))
+    for pkg in conf["DISABLE"].split():
+        if apply and pkg not in disabled and tv.version(pkg) is not None:
+            tv.sh(f"pm disable-user --user 0 {shlex.quote(pkg)}")
+            disabled = set(re.findall(r"package:(\S+)", tv.sh("pm list packages -d")))
+        if pkg in disabled or tv.version(pkg) is None:
+            yield "ok", f"disabled:{pkg}", "disabled"
+        else:
+            yield "warn", f"disabled:{pkg}", "enabled again: run `itt run tv setup`"
 
 
 def report(rows, as_json=False, verbose=False):
