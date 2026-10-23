@@ -1,7 +1,7 @@
 {
   "name": "homelab",
-  "version": "0.3.0",
-  "description": "Keep a Linux home machine healthy: one-pass health check (OS image, apps, firmware, disks, SMART, mounts, services, containers, tailnet) with a daily notifying timer, guided system updates, and an Android TV kept current over adb (Stremio, SmartTube, Tailscale) with a weekly update timer, and a debloated, unattended Windows 11 install USB (local account, apps removed during Setup, verified silent app installs at first logon).",
+  "version": "0.4.0",
+  "description": "Keep a Linux home machine healthy: one-pass health check (OS image, apps, firmware, disks, SMART, mounts, services, containers, tailnet) with a daily notifying timer, guided system updates, and an Android TV kept current over adb (Stremio, SmartTube, Tailscale, Key Mapper remote remaps) with a weekly update timer, and a debloated, unattended Windows 11 install USB (local account, apps removed during Setup, verified silent app installs at first logon).",
   "author": {
     "name": "Ivan Zdravkov",
     "url": "https://github.com/ivan-zdravkov"
@@ -25,6 +25,7 @@
     "windows-11",
     "autounattend",
     "debloat",
-    "winget"
+    "winget",
+    "keymapper"
   ]
 }
