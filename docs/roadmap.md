@@ -8,8 +8,9 @@ Skills distilled from months of real sessions, each turned generic here with per
 | **homelab** ✅ | homelab-check (OS, apps, firmware, disks, SMART, mounts, services, containers, tailnet; daily notify) ✅, system-updates ✅ · next: wake-and-power (WoL, idle draw), tv-tune (Android TV over ADB) | vendor apps, "smart" hubs, uptime SaaS |
 | **retro** ✅ | rom-library ✅ (audit, CHD/RVZ, m3u, 50 Hz), rom-sync ✅ (adb / SD) · next: emulator-patches, lutris-import (+ SteamGridDB art), game-streaming (Sunshine/Polaris + Moonlight over LAN/Tailscale), handheld-cfw notes | cloud gaming subscriptions |
 | **career** ✅ | job-digest ✅ (headless Claude on a timer: feeds, inbox triage, shortlist, reply/outreach drafts behind a send guard) · next: profile writing | job-board premium tiers |
+| **health** ✅ | daily-coach ✅ (wake-triggered headless plan from smart-ring/Apple Health data: exercise snacks, a local seasonal recipe, sleep, rotating measurements; phone check-in page with XP, comeback bonus, no streaks; trends; send guard) · next: weekly PDF/print report, partner night-duty view | fitness/sleep app subscriptions, personal-trainer check-ins |
 | **inbox** | triage and unsubscribe sweeps | mail "assistants" |
-| **kitchen** | chef: seasonal, locally available recipes, pantry-aware, family preferences | recipe/meal-kit apps |
-| **training** | training buddy: progressive overload plans, calendar events, check-ins | fitness subscriptions |
+| **kitchen** | chef: seasonal, locally available recipes, pantry-aware, family preferences (daily-coach already picks one recipe a day) | recipe/meal-kit apps |
+| **training** | training buddy: progressive overload plans, calendar events (daily-coach covers exercise snacks and check-ins) | fitness subscriptions |
 | **media** | convert-for-legacy-players (e.g. Wii), player troubleshooting | streaming add-ons |
 | **money** | subscription audit → self-hosted replacements | the subscriptions themselves |

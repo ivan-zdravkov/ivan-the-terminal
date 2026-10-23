@@ -1,0 +1,13 @@
+{
+  "name": "health",
+  "version": "0.1.0",
+  "description": "Daily health coach: smart-ring / Apple Health data in, a tiny gamified daily plan out (exercise snacks, a seasonal recipe, sleep, measurements), a phone check-in page with XP and trends, and a headless morning run behind a send guard.",
+  "author": {
+    "name": "Ivan Zdravkov",
+    "url": "https://github.com/ivan-zdravkov"
+  },
+  "homepage": "https://github.com/ivan-zdravkov/ivan-the-terminal",
+  "repository": "https://github.com/ivan-zdravkov/ivan-the-terminal",
+  "license": "MIT",
+  "keywords": ["health", "habits", "adhd", "sleep", "apple-health", "smart-ring", "gamification", "headless"]
+}

@@ -55,6 +55,7 @@ flowchart LR
 | [homelab](plugins/homelab) | `homelab-check` (daily, notifies), `system-updates` | ✅ |
 | [career](plugins/career) | `job-digest` (headless weekday run, send-guarded) | ✅ |
 | [retro](plugins/retro) | `rom-library` (audit, CHD/RVZ, playlists), `rom-sync` (adb / SD card) | ✅ |
+| [health](plugins/health) | `daily-coach` (ring/Apple Health → a tiny gamified daily plan by email, phone check-ins, XP, trends, seasonal recipe) | ✅ |
 | kitchen, training, … | see the [roadmap](docs/roadmap.md) | 🛠️ |
 
 ## Use it

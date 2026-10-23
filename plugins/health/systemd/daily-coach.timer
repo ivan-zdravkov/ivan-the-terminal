@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily coach fallback: make today's plan mid-morning if the wake shortcut didn't
+
+[Timer]
+OnCalendar=*-*-* 10:30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

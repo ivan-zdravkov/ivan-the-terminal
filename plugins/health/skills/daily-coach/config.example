@@ -1,0 +1,21 @@
+# ~/.config/ivan-the-terminal/daily-coach/config.env
+DIGEST_TO="you@example.com"          # the ONLY address the morning run may send to (the guard enforces it)
+MODEL="claude-sonnet-5-5"
+TOKEN=""                             # empty: generated once into the data dir, outside any repo (`coach url` shows the links)
+BIND="127.0.0.1,<tailscale-ip>"      # comma-separated; never a public interface
+PORT=8765
+PUBLIC_URL="http://<magicdns-host>:8765"   # base for links in the email and the shortcut
+DAY_START_HOUR=4                     # before 04:00 still counts as the previous day (night wake-ups)
+WEB_DOMAINS=""                       # recipe sites the run may WebFetch, space-separated (empty = any https site)
+LEVEL_NAMES=""                       # optional, comma-separated names for levels 1, 2, 3, ...
+
+# ~/.config/ivan-the-terminal/daily-coach/profile.md   (inserted into the morning prompt as PROFILE)
+# ## Me           age, height, work pattern, likely/diagnosed conditions that change the approach (e.g. ADHD)
+# ## Household    who lives with you, kids' ages, pets, who does night duty
+# ## Goals        what you want in 3 months (weight, shape, sleep, mood), and what "a good day" looks like
+# ## History      sports you loved and why, what failed before and why
+# ## Equipment    what is at home (kettlebells, bands, bar), stairs, park, dog walks
+# ## Food         who cooks, shops nearby, likes/dislikes, allergies, sweet tooth, salt, drinks
+# ## Recipes      location for seasonality, language, sites to search (e.g. local recipe sites), family constraints
+# ## Constraints  injuries, time windows, things never to suggest
+# ## Tone         how you want to be spoken to
