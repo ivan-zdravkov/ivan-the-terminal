@@ -53,9 +53,9 @@ flowchart LR
 |---|---|---|
 | [foundation](plugins/foundation) | `doctor`, `new-machine`, `ship-public`, `kaizen` | ✅ |
 | [homelab](plugins/homelab) | `homelab-check` (daily, notifies), `system-updates` | ✅ |
-| [career](plugins/career) | `job-digest` (headless weekday run, send-guarded) | ✅ |
+| [career](plugins/career) | `job-digest` (headless weekday run, no sending; ranked digest in a phone app with push and marks) | ✅ |
 | [retro](plugins/retro) | `rom-library` (audit, CHD/RVZ, playlists), `rom-sync` (adb / SD card) | ✅ |
-| [health](plugins/health) | `daily-coach` (ring/Apple Health → a tiny gamified daily plan by email, phone check-ins, XP, trends, seasonal recipe) | ✅ |
+| [health](plugins/health) | `daily-coach` (ring/Apple Health → a tiny gamified daily plan in a phone app with push, check-ins, XP, trends, seasonal recipe) | ✅ |
 | kitchen, training, … | see the [roadmap](docs/roadmap.md) | 🛠️ |
 
 ## Use it

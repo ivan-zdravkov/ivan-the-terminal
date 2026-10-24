@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily coach fallback: make today's plan mid-morning if the wake shortcut didn't
+Description=Daily coach fallback: make today's plan mid-morning if no ring sync started it
 
 [Timer]
 OnCalendar=*-*-* 10:30
