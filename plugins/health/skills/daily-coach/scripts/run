@@ -54,7 +54,8 @@ jq -n --arg guard "$TOOLS/guard.py" --arg tools "$TOOLS" --arg work "$WORK" \
 work_rule="/$WORK/**"  # "//abs/path" = absolute path; Edit(...) rules also cover Write (Write(...) rules are ignored)
 cmd=(claude -p --model "$MODEL" --permission-mode dontAsk --settings "$settings"
   --allowedTools
-    "Bash($TOOLS/coach:*)" "Bash(date:*)" "Read($work_rule)" "Edit($work_rule)" "WebSearch" "WebFetch"
+    "Bash($TOOLS/coach context:*)" "Bash($TOOLS/coach plan-set:*)" "Bash($TOOLS/coach has-plan:*)"
+    "Bash($TOOLS/coach status:*)" "Bash(date:*)" "Read($work_rule)" "Edit($work_rule)" "WebSearch" "WebFetch"
   --disallowedTools "mcp__claude_ai_Gmail" "NotebookEdit")
 
 if [ "$mode" = --dry-run ]; then

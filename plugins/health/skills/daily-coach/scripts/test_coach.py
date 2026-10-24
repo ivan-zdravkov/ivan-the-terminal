@@ -241,6 +241,7 @@ class GuardTest(unittest.TestCase):
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach serve"}), 2)
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach notify"}), 2)  # the runner pushes, not the model
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach context; rm -rf ~"}), 2)
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach status#;/t/coach url"}), 2)  # mid-word '#'
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach status $(id)"}), 2)
         self.assertEqual(self.run_guard("Bash", {"command": "python3 -c 1"}), 2)
 

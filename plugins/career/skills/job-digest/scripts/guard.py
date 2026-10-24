@@ -51,6 +51,7 @@ def check(tools_dir, work, event):
             block("no command substitution or multi-line commands")
         lexer = shlex.shlex(cmd, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
+        lexer.commenters = ""  # shlex ends a word at a mid-word '#'; bash doesn't: `x#;y` would hide `;y`
         words = list(lexer)
         if not words or any(set(w) <= set("();<>|&") for w in words):
             block("one plain command per call: no pipes, chaining or redirects")

@@ -48,7 +48,8 @@ G=mcp__claude_ai_Gmail
 work_rule="/$WORK/**"  # "//abs/path" is the permission-rule syntax for an absolute path
 cmd=(claude -p --model "$MODEL" --permission-mode dontAsk --settings "$settings"
   --allowedTools
-    "Bash($TOOLS/fetch:*)" "Bash($TOOLS/q:*)" "Bash($TOOLS/html:*)" "Bash($TOOLS/jobs:*)" "Bash(date:*)"
+    "Bash($TOOLS/fetch:*)" "Bash($TOOLS/q:*)" "Bash($TOOLS/html:*)" "Bash($TOOLS/jobs history:*)" "Bash($TOOLS/jobs digest-set:*)"
+    "Bash($TOOLS/jobs has-digest:*)" "Bash(date:*)"
     "Read($work_rule)" "Edit($work_rule)" "WebSearch" "WebFetch"
     "${G}__search_threads" "${G}__get_thread" "${G}__get_message" "${G}__list_labels"
     "${G}__label_thread" "${G}__label_message" "${G}__list_drafts" "${G}__get_draft"
