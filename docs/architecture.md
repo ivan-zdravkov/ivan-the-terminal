@@ -31,6 +31,8 @@ plugins/<plugin>/skills/<skill>/
 
 Skills that run unattended (timers) use headless `claude -p` with a tool allowlist and a guard hook, logging to `~/.local/state/ivan-the-terminal/<skill>/`.
 
+Skills that report something daily store the result locally and serve it as a home-screen phone app instead of emailing it. Each runs a stdlib server on localhost, published on the tailnet by `tailscale serve`, with shared offline and push support from `tools/webapp/` (see [phone-apps.md](phone-apps.md)). The headless run only stores the result; the runner script sends the push.
+
 ## Secrets
 
 The overlay uses sops+age. One age key (`~/.config/sops/age/keys.txt`, backed up offline) decrypts everything. Skills consume secrets with `sops exec-env <file> '<cmd>'`, so plaintext never touches disk or the transcript.

@@ -81,6 +81,8 @@ jobs:
           persist-credentials: false
       - name: leakguard unit tests
         run: python3 -I -m unittest discover -v -s tools/leakguard
+      - name: webapp unit tests
+        run: python3 -I -m unittest discover -v -s tools/webapp
       - name: Skill script tests
         run: |
           for d in plugins/*/skills/*/scripts; do

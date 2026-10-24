@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily coach: make and email today's plan (Claude Code, headless) if there is none yet
+Description=Daily coach: make today's plan for the app (Claude Code, headless) if there is none yet
 Wants=network-online.target
 After=network-online.target
 

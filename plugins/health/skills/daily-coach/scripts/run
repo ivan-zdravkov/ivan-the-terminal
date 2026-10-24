@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# daily-coach: build today's plan headless (claude -p) from ring data + check-ins, store it, email it.
+# daily-coach: build today's plan headless (claude -p) from ring data + check-ins, store it for the Daily app, push.
 #   run               make today's plan (re-plans if one exists: check-ins on matching item ids are kept)
 #   run --if-missing  only if today has no plan yet (what the wake trigger and the fallback timer use)
 #   run --dry-run     assemble prompt + command and print a summary; runs nothing
@@ -16,10 +16,9 @@ if [ ! -f "$CONF/config.env" ] || [ ! -f "$CONF/profile.md" ]; then
   echo "daily-coach: not configured: create $CONF/config.env and profile.md (templates in $SKILL/config.example)"
   exit 0
 fi
-DIGEST_TO="" MODEL="claude-sonnet-5-5" WEB_DOMAINS=""
+MODEL="claude-sonnet-5-5" WEB_DOMAINS=""
 # shellcheck source=/dev/null
 . "$CONF/config.env"
-[ -n "$DIGEST_TO" ] || { echo "daily-coach: DIGEST_TO missing in $CONF/config.env" >&2; exit 2; }
 
 TOOLS="$SKILL/scripts"
 [ "$mode" = --serve ] && exec "$TOOLS/coach" serve
@@ -31,12 +30,12 @@ flock -n 9 || { echo "daily-coach: a run is already in progress"; exit 0; }
 WORK=$(readlink -f "$STATE/work") LOGS="$STATE/logs"  # resolved: permission rules see real paths
 find "$WORK" -mindepth 1 -delete
 
-prompt=$(python3 -I - "$SKILL/references/prompt.md" "$CONF/profile.md" "$DIGEST_TO" "$WORK" "$TOOLS" <<'PY'
+prompt=$(python3 -I - "$SKILL/references/prompt.md" "$CONF/profile.md" "$WORK" "$TOOLS" <<'PY'
 import sys
-template, profile, to, work, tools = sys.argv[1:]
+template, profile, work, tools = sys.argv[1:]
 text = open(template, encoding="utf-8").read()
-for key, value in (("{{PROFILE}}", open(profile, encoding="utf-8").read().strip()), ("{{DIGEST_TO}}", to),
-                   ("{{WORK}}", work), ("{{TOOLS}}", tools)):
+for key, value in (("{{PROFILE}}", open(profile, encoding="utf-8").read().strip()), ("{{WORK}}", work),
+                   ("{{TOOLS}}", tools)):
     text = text.replace(key, value)
 print(text)
 PY
@@ -44,28 +43,23 @@ PY
 
 settings="$STATE/settings.json"
 # shellcheck disable=SC2086  # WEB_DOMAINS is a space-separated list: one jq arg per domain
-jq -n --arg guard "$TOOLS/guard.py" --arg tools "$TOOLS" --arg work "$WORK" --arg to "$DIGEST_TO" \
+jq -n --arg guard "$TOOLS/guard.py" --arg tools "$TOOLS" --arg work "$WORK" \
   --args '{hooks: {PreToolUse: [{
-  matcher: "Bash|Write|Edit|WebFetch|mcp__claude_ai_Gmail__.*",
-  hooks: [{type: "command", command: ("python3 -I " + ([$guard, $tools, $work, $to] + $ARGS.positional | map(@sh) | join(" ")))}]}]}}' \
+  matcher: "Bash|Write|Edit|WebFetch|mcp__.*",
+  hooks: [{type: "command", command: ("python3 -I " + ([$guard, $tools, $work] + $ARGS.positional | map(@sh) | join(" ")))}]}]}}' \
   $WEB_DOMAINS > "$settings"
 
-# Least privilege: no interpreter, Read/Write only inside WORK, Gmail limited to reading plan threads and sending
-# the plan to its owner. Recipe pages are untrusted, so nothing here may turn an injection into code or mail.
-G=mcp__claude_ai_Gmail
+# Least privilege: no interpreter, Read/Write only inside WORK, no mail or other MCP tools (the plan goes to the
+# app). Recipe pages are untrusted, so nothing here may turn an injection into code, mail or a leak.
 work_rule="/$WORK/**"  # "//abs/path" = absolute path; Edit(...) rules also cover Write (Write(...) rules are ignored)
 cmd=(claude -p --model "$MODEL" --permission-mode dontAsk --settings "$settings"
   --allowedTools
     "Bash($TOOLS/coach:*)" "Bash(date:*)" "Read($work_rule)" "Edit($work_rule)" "WebSearch" "WebFetch"
-    "${G}__search_threads" "${G}__get_thread" "${G}__send_message"
-  --disallowedTools
-    "${G}__forward" "${G}__reply" "${G}__create_draft" "${G}__update_draft" "${G}__delete_draft"
-    "${G}__trash_message" "${G}__trash_thread" "${G}__label_thread" "${G}__label_message" "${G}__unlabel_thread"
-    "${G}__unlabel_message" "${G}__get_message" "NotebookEdit")
+  --disallowedTools "mcp__claude_ai_Gmail" "NotebookEdit")
 
 if [ "$mode" = --dry-run ]; then
   echo "prompt: $(wc -c <<<"$prompt") bytes, $(grep -c '{{' <<<"$prompt") unfilled placeholders"
-  echo "model: $MODEL  plan to: $DIGEST_TO  work: $WORK"
+  echo "model: $MODEL  work: $WORK"
   echo "guard: $(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")"
   echo "status:"; "$TOOLS/coach" status | sed 's/^/  /'
   "$TOOLS/coach" url
@@ -78,6 +72,7 @@ DAILY_COACH_WORK="$WORK" "${cmd[@]}" <<<"$prompt" >"$LOG" 2>&1  # prompt on stdi
 status=$?
 rm -f "$DATA/last-trigger"  # let the phone trigger again if this run failed
 if [ "$status" -eq 0 ] && ! "$TOOLS/coach" has-plan; then status=3; fi  # finished without storing a plan
+if [ "$status" -eq 0 ]; then "$TOOLS/coach" notify >>"$LOG" 2>&1; fi  # best effort: the app shows it either way
 if [ "$status" -ne 0 ] && command -v notify-send >/dev/null; then notify-send "Daily coach failed" "See $LOG"; fi
 find "$LOGS" -name '*.log' -mtime +30 -delete
 exit "$status"

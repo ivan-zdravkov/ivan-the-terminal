@@ -1,37 +1,34 @@
 #!/usr/bin/env python3
-"""daily-coach: health samples, daily plans and check-ins in one SQLite file, plus the phone page. Stdlib only.
+"""daily-coach: health samples, daily plans and check-ins in one SQLite file, plus the phone app. Stdlib only.
 
-  coach.py serve                 HTTP server: check-in page, dashboard, /ingest for the phone (config: BIND, PORT)
-  coach.py url                   print the check-in and ingest URLs (they contain the secret token)
+  coach.py serve                 HTTP server: the Daily app (check-in, trends), /ingest for the phone (config: BIND, PORT)
+  coach.py url                   print the app and ingest URLs (they contain the secret token)
   coach.py ingest FILE           store samples from a file (same format as POST /ingest)
   coach.py context [--days N]    JSON for the morning run: nights, vitals vs baseline, readiness, check-ins, XP
   coach.py plan-set FILE         validate and store today's plan (FILE must be inside $DAILY_COACH_WORK when set)
-  coach.py email                 JSON {subject, html, text} for today's plan
+  coach.py notify                push "today's plan is ready" to every phone that turned notifications on
   coach.py has-plan              exit 0 if today has a plan, 1 if not
-  coach.py status                last sync, metrics seen, unknown sample types, today's plan, XP
+  coach.py status                last sync, metrics seen, unknown sample types, today's plan, XP, push devices
 
 Config: ~/.config/ivan-the-terminal/daily-coach/config.env (see ../config.example). Data: ~/.local/share/ivan-the-terminal/daily-coach/
 """
 import argparse
-import hmac
 import html
+import importlib.util
 import json
 import math
 import os
 import re
-import secrets
 import shlex
 import sqlite3
 import statistics
 import subprocess
 import sys
-import threading
 import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from functools import lru_cache
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
 
 HOME = Path.home()
 CONF = Path(os.environ.get("DAILY_COACH_CONF") or
@@ -39,7 +36,11 @@ CONF = Path(os.environ.get("DAILY_COACH_CONF") or
 DATA = Path(os.environ.get("DAILY_COACH_DATA") or
             Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")) / "ivan-the-terminal/daily-coach")
 DEFAULTS = {"BIND": "127.0.0.1", "PORT": "8765", "TOKEN": "", "PUBLIC_URL": "", "DAY_START_HOUR": "4",
-            "LEVEL_NAMES": "", "TRIGGER": "systemctl --user start --no-block daily-coach.service"}
+            "AUTO_PLAN_HOUR": "6", "LEVEL_NAMES": "", "TRIGGER": "systemctl --user start --no-block daily-coach.service"}
+_spec = importlib.util.spec_from_file_location("webapp", Path(__file__).resolve().parents[5] / "tools/webapp/webapp.py")
+webapp = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(webapp)
+THEME, BG = "#2f6f4f", "#f6f5f1"
 
 # Health sample type names (English and Bulgarian iPhone locales) -> metric. Order matters: specific before generic.
 METRICS = [
@@ -66,16 +67,7 @@ COMEBACK_XP = 20
 # ---------------------------------------------------------------- config, db, time
 
 def config():
-    cfg = dict(DEFAULTS)
-    if CONF.is_file():
-        for line in CONF.read_text(encoding="utf-8").splitlines():
-            m = re.match(r"\s*([A-Z_]+)=(.*)$", line)
-            if not m:
-                continue
-            raw = m.group(2).strip()
-            q = re.match(r"""(["'])(.*?)\1""", raw)
-            cfg[m.group(1)] = q.group(2) if q else re.sub(r"\s+#.*$", "", raw)
-    return cfg
+    return webapp.env(CONF, DEFAULTS)
 
 
 CFG = config()
@@ -100,14 +92,7 @@ def db():
 
 def token():
     """Secret path prefix for every URL. From config, else generated once into the data dir (outside any repo)."""
-    if CFG["TOKEN"]:
-        return CFG["TOKEN"]
-    f = DATA / "token"
-    if not f.exists():
-        DATA.mkdir(parents=True, exist_ok=True)
-        f.touch(mode=0o600)
-        f.write_text(secrets.token_urlsafe(24))
-    return f.read_text().strip()
+    return webapp.token(CFG["TOKEN"], DATA)
 
 
 def today():
@@ -530,71 +515,43 @@ def context(con, days=14):
     }
 
 
-# ---------------------------------------------------------------- email
+# ---------------------------------------------------------------- app links, notification, auto start
 
 def link(path=""):
     base = CFG["PUBLIC_URL"].rstrip("/")
     return f"{base}/{token()}/{path}" if base else ""
 
 
-def email(con):
-    t = today()
-    plan = plan_of(con, t)
+def push():
+    return webapp.Push(DATA, CFG["PUBLIC_URL"] or "mailto:daily-coach@localhost")
+
+
+def latest(con):
+    """What a push notification says: the newest plan's headline and its floor."""
+    r = con.execute("SELECT day FROM plans ORDER BY day DESC LIMIT 1").fetchone()
+    plan = plan_of(con, date.fromisoformat(r[0])) if r else None
     if not plan:
-        raise ValueError("no plan for today")
-    ctx = context(con, 7)
-    n, xp = ctx["last_night"], ctx["xp"]
-    e = html.escape
-    emo = READINESS[plan["readiness"]]
-    subject = f"[daily-coach] {t.strftime('%a %d %b')} {emo} {plan.get('headline', '')}".strip()
-    sleep = (f"{n['asleep_h']:.1f} h asleep ({n['bed']}–{n['wake']}), {n['wakes']} wake-ups, deep {n['deep_min']} min"
-             if n.get("asleep_h") is not None else "No ring data from last night.")
-    vit = ", ".join(f"{k} {n[k]}" for k in ("hrv", "rhr", "spo2", "temp") if n.get(k) is not None)
-    page = link()
-    btn = (f'<p><a href="{e(page)}" style="display:inline-block;padding:12px 20px;background:#2f6f4f;color:#fff;'
-           f'border-radius:8px;text-decoration:none;font-weight:600">Open today’s check-in →</a></p>') if page else ""
-    items = "".join(f"<li style=\"margin:4px 0\">{'<b>' if i['core'] else ''}{e(i['label'])}{'</b>' if i['core'] else ''}"
-                    f" <span style=\"color:#888\">+{i['xp']}</span></li>" for i in plan["items"])
+        return {"day": None, "title": "Daily", "body": "No plan yet.", "url": ""}
+    core = [i["label"] for i in plan["items"] if i["core"]]
     rec = plan.get("recipe")
-    rec_html = (f"<h3 style=\"margin:18px 0 4px\">🍲 Cook today</h3><p style=\"margin:0\"><a href=\"{e(rec['url'])}\">"
-                f"{e(rec['title'])}</a> · {rec['time_min']} min<br>{e(rec['why'])}</p>"
-                + (f"<p style=\"margin:4px 0;color:#555\">Shop: {e(', '.join(rec['shopping']))}</p>" if rec["shopping"] else "")
-                ) if rec else ""
-    weekly = f"<h3 style=\"margin:18px 0 4px\">📈 Last week</h3><p style=\"margin:0\">{e(plan['weekly'])}</p>" if plan.get("weekly") else ""
-    body = f"""<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;line-height:1.45;color:#222">
-<h2 style="margin:0 0 6px">{emo} {e(plan.get('headline', ''))}</h2>
-<p style="margin:0 0 6px;color:#555">{e(sleep)}{(' · ' + e(vit)) if vit else ''}</p>
-{f'<p style="margin:0 0 6px">{e(plan["ack"])}</p>' if plan.get('ack') else ''}
-<p style="margin:0 0 10px">{e(plan.get('why', ''))}</p>
-{btn}
-<h3 style="margin:18px 0 4px">Today (bold = the floor)</h3><ul style="padding-left:20px;margin:0">{items}</ul>
-{rec_html}
-{f'<h3 style="margin:18px 0 4px">💡</h3><p style="margin:0">{e(plan["tip"])}</p>' if plan.get('tip') else ''}
-{weekly}
-<p style="margin:18px 0 0;color:#666;font-size:13px">{e(xp['name'])} · {xp['xp']} XP ({xp['progress']}% to next) ·
-showed up {xp['showed_up_7']}/7 days · this week {xp['xp_this_week']} XP vs {xp['xp_last_week']} last week<br>
-Reply to this email with anything I should know (sick kid, bad night, too much, too easy). The next plan reads it.</p></div>"""
-    text = "\n".join([f"{emo} {plan.get('headline', '')}", sleep, plan.get("ack", ""), plan.get("why", ""),
-                      f"Check in: {page}" if page else "", "", "Today (* = the floor):"]
-                     + [f"{'*' if i['core'] else '-'} {i['label']} (+{i['xp']})" for i in plan["items"]]
-                     + ([f"\nCook: {rec['title']} {rec['url']}"] if rec else [])
-                     + ([f"\nTip: {plan['tip']}"] if plan.get("tip") else [])
-                     + ([f"\nLast week: {plan['weekly']}"] if plan.get("weekly") else [])
-                     + [f"\n{xp['name']} · {xp['xp']} XP · showed up {xp['showed_up_7']}/7"])
-    return {"subject": subject, "html": body, "text": text}
+    return {"day": plan["date"], "title": f"{READINESS[plan['readiness']]} {plan.get('headline', 'Your plan is ready')}",
+            "body": " · ".join(core[:3]) + (f" · 🍲 {rec['title']}" if rec else ""), "url": ""}
+
+
+def night_over(con, now=None):
+    """Last night's sleep ended 20+ min ago and it's past AUTO_PLAN_HOUR: a sync now can start today's plan."""
+    now = now or time.time()
+    if datetime.fromtimestamp(now).hour < int(CFG["AUTO_PLAN_HOUR"]):
+        return False
+    t = today()
+    end = con.execute("SELECT max(end) FROM samples WHERE metric='sleep' AND text IN (?,?,?,?) AND end>? AND end<=?",
+                      (*ASLEEP, at(t - timedelta(days=1), 18), int(now))).fetchone()[0]
+    return bool(end) and now - end >= 20 * 60
 
 
 # ---------------------------------------------------------------- web
 
-CSS = """:root{--bg:#f6f5f1;--card:#fff;--fg:#1d1d1b;--mute:#6b6a65;--line:#e4e2dc;--acc:#2f6f4f;--acc2:#e9f3ee;
---green:#2f9e5b;--yellow:#d9a21b;--red:#d1493f}
-@media (prefers-color-scheme:dark){:root{--bg:#141513;--card:#1e201d;--fg:#ecebe6;--mute:#a09f98;--line:#30332e;
---acc:#6cc495;--acc2:#20352a}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,system-ui,Segoe UI,Roboto,sans-serif}
-main{max-width:640px;margin:0 auto;padding:16px 16px 48px}a{color:var(--acc)}h1{font-size:22px;margin:4px 0}
-h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:22px 0 8px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
-.mute{color:var(--mute);font-size:14px}.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;background:var(--acc2)}
+CSS = webapp.css(THEME, "#e9f3ee", "#6cc495", "#20352a") + """
 .bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:var(--acc)}
 .item{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}.item:first-child{border-top:0}
 .item input[type=checkbox]{width:28px;height:28px;flex:none;accent-color:var(--acc);margin:0}
@@ -602,13 +559,10 @@ h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute
 .done .t>b{text-decoration:line-through;opacity:.6}.row{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
 input[type=number],textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
 input[type=number]{width:110px}textarea{width:100%;min-height:60px}
-button{font:inherit;padding:8px 14px;border:0;border-radius:8px;background:var(--acc);color:#fff}button.s{background:var(--acc2);color:var(--fg);min-width:44px}
-button.s.on{background:var(--acc);color:#fff}.big{width:100%;padding:14px;font-size:17px}
-nav{display:flex;justify-content:space-between;font-size:14px}svg{width:100%;height:auto;display:block}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}"""
+svg{width:100%;height:auto;display:block}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}"""
 
-JS = """const T=location.pathname.split('/')[1];const D=document.body.dataset.day;
-async function post(p,b){const r=await fetch('/'+T+'/'+p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
+JS = """const D=document.body.dataset.day;
+async function post(p,b){const r=await fetch(p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
 const j=await r.json();if(!r.ok){alert(j.error||'failed');return null}return j}
 function upd(j){if(!j)return;document.getElementById('xp').textContent=j.name+' · '+j.xp+' XP';document.getElementById('xpbar').style.width=j.progress+'%';
 document.getElementById('xpday').textContent=j.today.xp+' XP today · '+j.today.done+'/'+j.today.total+' done'+(j.today.showed_up?' · showed up ✓':'')}
@@ -618,14 +572,23 @@ if(k==='number'||k==='text')el.querySelector('button').addEventListener('click',
 const v=f.value.trim();const j=await post('api/check',{day:D,id,...(k==='number'?{value:v===''?null:v.replace(',','.')}:{text:v})});if(j){box.classList.toggle('done',v!=='');upd(j)}});
 if(k==='scale')el.querySelectorAll('button').forEach(b=>b.addEventListener('click',async()=>{el.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
 b.classList.add('on');box.classList.add('done');upd(await post('api/check',{day:D,id,value:+b.textContent}))}))});
-const w=document.getElementById('wake');if(w)w.addEventListener('click',async()=>{w.disabled=true;const j=await post('wake',{});if(j)w.textContent=j.status})"""
+const w=document.getElementById('wake');if(w)w.addEventListener('click',async()=>{w.disabled=true;const j=await post('wake',{});if(j)w.textContent=j.status});
+const W=document.body.dataset.waiting;if(W)setInterval(()=>fetch('api/latest',{cache:'no-store'}).then(r=>r.json())
+.then(j=>{if(j.day===W)location.reload()}).catch(()=>0),30000)"""
 
 
-def page(title, body, day=""):
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Daily">
-<link rel="manifest" href="manifest.webmanifest"><title>{html.escape(title)}</title><style>{CSS}</style></head>
-<body data-day="{day}"><main>{body}</main><script>{JS}</script></body></html>"""
+@lru_cache(maxsize=1)
+def vapid():
+    try:
+        return push().public_key()
+    except (OSError, subprocess.SubprocessError):
+        return ""  # no openssl: the app works, just without notifications
+
+
+def page(title, body, day="", waiting=""):
+    return f"""<!doctype html><html lang="en"><head>{webapp.head("Daily", THEME, vapid())}<title>{html.escape(title)}</title>
+<style>{CSS}</style></head><body data-day="{day}" data-waiting="{waiting}" data-at="{datetime.now():%a %H:%M}"><main>{body}
+<p class=mute id=push></p></main><script>{JS}</script><script>{webapp.CLIENT_JS}</script></body></html>"""
 
 
 def item_html(it, c):
@@ -652,8 +615,20 @@ def item_html(it, c):
 
 
 def today_page(con, day):
+    """The plan for `day`. Today without a plan yet shows the newest earlier plan under a 'being made' note."""
+    e, waiting, notice = html.escape, "", ""
+    if day == today() and not plan_of(con, day):
+        running = (DATA / "last-trigger").exists() and time.time() - (DATA / "last-trigger").stat().st_mtime < 900
+        waiting = day.isoformat()
+        msg = ("Today’s plan is being made: this page switches to it by itself." if running else
+               "No plan for today yet. It starts when your ring data arrives, or at the fallback time.")
+        btn = "" if running else "<button id=wake class=big>I’m up: make my plan</button>"
+        prev = con.execute("SELECT day FROM plans WHERE day<? ORDER BY day DESC LIMIT 1", (day.isoformat(),)).fetchone()
+        if prev:
+            day = date.fromisoformat(prev[0])
+            msg += f" Until then, here is {day.strftime('%A')}’s."
+        notice = f"<div class=card>{msg}{btn}</div>"
     plan, ch, xp = plan_of(con, day), checks_of(con, day), xp_summary(con)
-    e = html.escape
     nav = (f"<nav><a href='?d={day - timedelta(days=1)}'>← {(day - timedelta(days=1)).strftime('%a')}</a>"
            f"<a href='dashboard'>Trends</a>" + (f"<a href='?d={day + timedelta(days=1)}'>{(day + timedelta(days=1)).strftime('%a')} →</a>"
                                                 if day < today() else "<span></span>") + "</nav>")
@@ -663,10 +638,8 @@ def today_page(con, day):
             f"<div class=mute id=xpday>{xpday}</div><div class=mute>Showed up {xp['showed_up_7']}/7 days · {xp['showed_up_28']}/28 · "
             f"{xp['xp_this_week']} XP this week (last week {xp['xp_last_week']})</div></div>")
     if not plan:
-        running = (DATA / "last-trigger").exists() and time.time() - (DATA / "last-trigger").stat().st_mtime < 900
-        msg = "Your plan is being made. Refresh in a couple of minutes." if running else "No plan for this day yet."
-        btn = "<button id=wake class=big>I’m up: make my plan</button>" if day == today() and not running else ""
-        return page("Daily", f"{nav}<h1>{day.strftime('%A %d %b')}</h1>{head}<div class=card>{msg}{btn}</div>", day.isoformat())
+        return page("Daily", f"{nav}<h1>{day.strftime('%A %d %b')}</h1>{head}{notice or '<div class=card>No plan for this day.</div>'}",
+                    day.isoformat(), waiting)
     n = night(con, day)
     sleep = (f"{n['asleep_h']:.1f} h asleep · {n['bed']}–{n['wake']} · {n['wakes']} wake-ups · deep {n['deep_min']} min"
              if n.get("asleep_h") is not None else "No ring data from last night")
@@ -676,11 +649,11 @@ def today_page(con, day):
     rec_html = (f"<h2>Cook today</h2><div class=card><a href='{e(rec['url'])}'><b>{e(rec['title'])}</b></a>"
                 f"<div class=mute>{rec['time_min']} min · {e(rec['why'])}</div>"
                 + (f"<div class=mute>Shop: {e(', '.join(rec['shopping']))}</div>" if rec["shopping"] else "") + "</div>") if rec else ""
-    body = (f"{nav}<h1>{READINESS[plan['readiness']]} {e(plan.get('headline', ''))}</h1><div class=mute>{day.strftime('%A %d %b')} · {e(sleep)}</div>"
+    body = (f"{nav}{notice}<h1>{READINESS[plan['readiness']]} {e(plan.get('headline', ''))}</h1><div class=mute>{day.strftime('%A %d %b')} · {e(sleep)}</div>"
             f"{head}{comeback}<p>{e(plan.get('ack', ''))} {e(plan.get('why', ''))}</p><h2>Today · ★ = the floor</h2><div class=card>{items}</div>{rec_html}"
             + (f"<h2>Tip</h2><div class=card>{e(plan['tip'])}</div>" if plan.get("tip") else "")
             + (f"<h2>Last week</h2><div class=card>{e(plan['weekly'])}</div>" if plan.get("weekly") else ""))
-    return page("Daily", body, day.isoformat())
+    return page("Daily", body, day.isoformat(), waiting)
 
 
 def chart(title, points, unit="", bars=False, digits=1):
@@ -744,49 +717,21 @@ def trigger(con, reason):
     con.execute("INSERT INTO events VALUES (?,?,?)", (int(time.time()), "trigger", reason))
     con.commit()
     subprocess.Popen(shlex.split(CFG["TRIGGER"]), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return "Making your plan: it lands in your inbox in a few minutes"
+    return "Making your plan: it shows up in the app in a few minutes"
 
 
-MANIFEST = {"name": "Daily", "short_name": "Daily", "start_url": "./", "display": "standalone",
-            "background_color": "#f6f5f1", "theme_color": "#2f6f4f"}
-
-
-class Handler(BaseHTTPRequestHandler):
+class Handler(webapp.AppHandler):
     server_version = "daily-coach"
-
-    def log_message(self, fmt, *args):
-        pass
-
-    def send(self, code, body, ctype="text/html; charset=utf-8"):
-        data = body.encode() if isinstance(body, str) else body
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'")
-        self.end_headers()
-        self.wfile.write(data)
-
-    def route(self):
-        u = urlparse(self.path)
-        parts = [p for p in u.path.split("/") if p]
-        secret = token()
-        if len(secret) < 16 or not parts or not hmac.compare_digest(parts[0].encode(), secret.encode()):
-            return None, None
-        return parts[1:], {k: v[0] for k, v in parse_qs(u.query).items()}
+    secret = staticmethod(lambda: token())
 
     def do_GET(self):
         rest, q = self.route()
         if rest is None:
             return self.send(404, "not found", "text/plain")
+        if self.redirect_to_slash():
+            return None
         con = db()
         try:
-            if rest == [] and not urlparse(self.path).path.endswith("/"):
-                self.send_response(301)
-                self.send_header("Location", f"/{token()}/")
-                self.end_headers()
-                return None
             if rest == []:
                 day = date.fromisoformat(q["d"]) if "d" in q else today()
                 return self.send(200, today_page(con, min(day, today())))
@@ -794,8 +739,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, dashboard(con, max(7, min(int(q.get("days", 30)), 730))))
             if rest == ["api", "today"]:
                 return self.send(200, json.dumps({"plan": plan_of(con, today()), **xp_summary(con)}), "application/json")
+            if rest == ["api", "latest"]:
+                return self.send(200, json.dumps(latest(con), ensure_ascii=False), "application/json")
+            if rest == ["api", "ping"]:
+                return self.send(200, "{}", "application/json")
             if rest == ["manifest.webmanifest"]:
-                return self.send(200, json.dumps(MANIFEST), "application/manifest+json")
+                return self.send(200, webapp.manifest("Daily", BG, THEME), "application/manifest+json")
+            if len(rest) == 1 and (f := webapp.static(rest[0], THEME, "#ffffff", "ring")):
+                return self.send(200, *f)
             return self.send(404, "not found", "text/plain")
         except ValueError as ex:
             return self.send(400, str(ex), "text/plain")
@@ -806,17 +757,21 @@ class Handler(BaseHTTPRequestHandler):
         rest, q = self.route()
         if rest is None:
             return self.send(404, "not found", "text/plain")
-        n = int(self.headers.get("Content-Length") or 0)
-        if n > 8_000_000:
+        try:
+            body = self.body(8_000_000)
+        except ValueError:
             return self.send(413, "too large", "text/plain")
-        body = self.rfile.read(n).decode("utf-8", "replace")
         con = db()
         try:
             if rest == ["ingest"]:
                 res = ingest(con, body)
                 if q.get("wake") == "1":
                     res["status"] = trigger(con, "wake")
+                elif not plan_of(con, today()) and night_over(con):
+                    res["status"] = trigger(con, "auto")
                 return self.send(200, json.dumps(res, ensure_ascii=False), "application/json")
+            if rest == ["api", "push"]:
+                return self.send(200, json.dumps({"devices": push().subscribe(json.loads(body or "{}"))}), "application/json")
             if rest == ["wake"]:
                 return self.send(200, json.dumps({"status": trigger(con, "button")}), "application/json")
             if rest == ["api", "check"]:
@@ -832,16 +787,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def serve():
-    if len(token()) < 16:
-        sys.exit(f"daily-coach: TOKEN must be 16+ random chars ({CONF})")
     db().close()
-    servers = []
-    for addr in [a.strip() for a in CFG["BIND"].split(",") if a.strip()]:
-        servers.append(ThreadingHTTPServer((addr, int(CFG["PORT"])), Handler))
-        print(f"daily-coach: listening on {addr}:{CFG['PORT']}", flush=True)
-    for s in servers[1:]:
-        threading.Thread(target=s.serve_forever, daemon=True).start()
-    servers[0].serve_forever()
+    webapp.serve("daily-coach", Handler, CFG["BIND"], CFG["PORT"])
 
 
 def status(con):
@@ -857,6 +804,8 @@ def status(con):
     print("plan today:", "yes" if plan_of(con, t) else "no")
     x = xp_summary(con)
     print(f"xp: {x['name']} {x['xp']} XP · showed up {x['showed_up_7']}/7")
+    last = con.execute("SELECT at, detail FROM events WHERE kind='notify' ORDER BY at DESC LIMIT 1").fetchone()
+    print(f"push: {len(push().subs())} device(s)" + (f", last {datetime.fromtimestamp(last[0]):%m-%d %H:%M} ({last[1]})" if last else ""))
 
 
 def main():
@@ -866,7 +815,7 @@ def main():
     sub.add_parser("ingest").add_argument("file")
     sub.add_parser("context").add_argument("--days", type=int, default=14)
     sub.add_parser("plan-set").add_argument("file")
-    for c in ("email", "has-plan", "status", "url"):
+    for c in ("notify", "has-plan", "status", "url"):
         sub.add_parser(c)
     a = ap.parse_args()
     if a.cmd == "serve":
@@ -874,7 +823,8 @@ def main():
     if a.cmd == "url":
         if not CFG["PUBLIC_URL"]:
             sys.exit(f"daily-coach: set PUBLIC_URL in {CONF}")
-        return print(f"check-in: {link()}\ntrends:   {link('dashboard')}\nshortcut: {link('ingest?wake=1')}")
+        return print(f"app:      {link()}\ntrends:   {link('dashboard')}\nsync:     {link('ingest')}\n"
+                     f"morning:  {link('ingest?wake=1')}")
     con = db()
     try:
         if a.cmd == "ingest":
@@ -884,8 +834,11 @@ def main():
         elif a.cmd == "plan-set":
             plan = plan_set(con, a.file)
             print(f"plan stored for {plan['date']}: {len(plan['items'])} items")
-        elif a.cmd == "email":
-            print(json.dumps(email(con), ensure_ascii=False))
+        elif a.cmd == "notify":
+            sent, dropped = push().send()
+            con.execute("INSERT INTO events VALUES (?,?,?)", (int(time.time()), "notify", f"sent={sent} dropped={dropped}"))
+            con.commit()
+            print(f"pushed to {sent} device(s), dropped {dropped} expired")
         elif a.cmd == "has-plan":
             sys.exit(0 if plan_of(con, today()) else 1)
         elif a.cmd == "status":

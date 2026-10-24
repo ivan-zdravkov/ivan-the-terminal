@@ -16,6 +16,7 @@ base=$(git merge-base HEAD origin/main 2>/dev/null || echo --root)
 "${lg[@]}" range "$base" HEAD
 gitleaks git --redact --no-banner --log-level warn .
 python3 -I -m unittest discover -q -s tools/leakguard 2>&1 | tail -1
+python3 -I -m unittest discover -q -s tools/webapp 2>&1 | tail -1
 for d in plugins/*/skills/*/scripts; do
   if compgen -G "$d/test_*.py" >/dev/null; then python3 -I -m unittest discover -q -s "$d" 2>&1 | tail -1; fi
 done

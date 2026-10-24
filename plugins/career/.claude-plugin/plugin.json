@@ -1,7 +1,7 @@
 {
   "name": "career",
   "version": "0.1.0",
-  "description": "Unattended job search: a weekday headless Claude run that scans remote job feeds and boards, triages recruiter mail, drafts replies and cold outreach (never sends), archives job alerts and emails one ranked digest, behind a send guard.",
+  "description": "Unattended job search: a weekday headless Claude run that scans remote job feeds and boards, triages recruiter mail, drafts replies and cold outreach (never sends), archives job alerts and stores one ranked digest in a phone app over the tailnet (push, Applied/Later/Not-for-me marks it learns from), behind a guard that blocks all sending.",
   "author": {
     "name": "Ivan Zdravkov",
     "url": "https://github.com/ivan-zdravkov"

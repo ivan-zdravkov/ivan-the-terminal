@@ -1,12 +1,11 @@
 [Unit]
-Description=Daily coach: phone check-in page, trends and Health ingest (tailnet + localhost only)
+Description=Daily coach: the Daily phone app and Health ingest (localhost only; tailscale serve publishes it on the tailnet)
 Wants=network-online.target
 After=network-online.target tailscaled.service
 
 [Service]
 ExecStart=%h/.local/bin/itt run daily-coach --serve
 Environment=PATH=%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
-# The tailnet address may not exist yet at boot: retry until it does.
 Restart=always
 RestartSec=15
 
