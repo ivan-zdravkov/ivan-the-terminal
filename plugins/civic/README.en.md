@@ -6,6 +6,16 @@ A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop
 
 [Българска версия](README.md)
 
+**Contents**
+
+- [What it does](#what-it-does)
+- [Limitations](#limitations)
+- [Witnesses](#witnesses)
+- [Install](#install)
+- [Privacy](#privacy)
+- [Contribute authority emails](#contribute-authority-emails)
+- [Replaces](#replaces)
+
 ## What it does
 - **Photos → facts:** date, time and location from Exif; plate, make, model and colour from the image. `scripts/exif.py` is stdlib-only and reads JPEG, HEIC, PNG and WebP.
 - **Violations with legal basis:** crossings, intersections, sidewalks without 2 m for pedestrians, tactile paving, ramps, disabled bays, bike lanes, stops, double parking and more. Each maps to the Road Traffic Act as amended in 2025 ([violations.md](skills/podai-globata/references/violations.md)).
