@@ -3,6 +3,7 @@ import struct
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -95,6 +96,23 @@ class Exif(unittest.TestCase):
     def test_garbage_does_not_crash(self):
         for blob in (b"", b"Exif\0\0II*\0\xff\xff\xff\xff", b"Exif\0\0MM\0*\0\0\0\x08\xff\xff" + b"\0" * 20):
             self.assertIn("warning", exif.read(self.write("g.jpg", blob)))
+
+    def test_zip_of_photos_is_read_in_memory(self):
+        z = Path(self.tmp.name) / "Archive.zip"
+        with zipfile.ZipFile(z, "w") as f:
+            f.writestr("IMG_0001.HEIC", b"\0\0\0\x18ftypheic" + b"\0\0\0\x06Exif\0\0" + sample())
+            f.writestr("sub/IMG_0002.JPG", jpeg(sample(gps=False)))
+            f.writestr("__MACOSX/._IMG_0001.HEIC", b"junk")
+            f.writestr("notes.txt", b"hello")
+        rs = exif.read_all(z)
+        self.assertEqual([f"{z}:IMG_0001.HEIC", f"{z}:sub/IMG_0002.JPG"], [r["file"] for r in rs])
+        self.check_full(rs[0])
+        self.assertNotIn("lat", rs[1])
+        self.assertFalse((Path(self.tmp.name) / "IMG_0001.HEIC").exists())  # nothing extracted to disk
+        empty = Path(self.tmp.name) / "empty.zip"
+        with zipfile.ZipFile(empty, "w") as f:
+            f.writestr("a.txt", b"x")
+        self.assertIn("no photos", exif.read_all(empty)[0]["warning"])
 
     def test_summary_picks_most_accurate_fix_and_earliest_time(self):
         a = {"file": "a", "lat": 42.5, "lon": 23.25, "accuracy_m": 20, "taken_local": "2026-10-26 08:42:00"}

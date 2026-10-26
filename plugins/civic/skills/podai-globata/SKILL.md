@@ -11,9 +11,10 @@ Be fast: one short summary per step, ask everything missing in a single message.
 
 ## 1. Photos → facts
 1. Find the files: on claude.ai `/mnt/user-data/uploads/`, in Claude Code the paths given. Run
-   `python3 scripts/exif.py FILE...`. If the photos exist only as chat images (no files), metadata is gone: continue.
-2. No GPS in `summary`: say so in one line and ask for the address or a map pin (Google Maps: long-press → the
-   coordinates are copied). For why and how to keep location next time, read `references/photos.md`.
+   `python3 scripts/exif.py FILE...` (zips of photos work too). If the photos exist only as chat images (no files),
+   metadata is gone: continue.
+2. No time or GPS in `summary` (common: the iPhone app strips it): look at the photos first, then ask once, with your
+   guesses, as `references/photos.md` shows. Never make the user re-send or re-attach photos.
 3. `spread_m` > 100 or times more than an hour apart: ask whether it's one car and one place.
 4. Look at every photo: plate (Latin capitals, no spaces), make, model, colour, visible signs, markings, street names,
    house numbers. Match what you see to `references/violations.md`. Never guess a plate or a violation: if unsure, ask.

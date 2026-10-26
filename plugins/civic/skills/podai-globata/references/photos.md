@@ -1,23 +1,27 @@
-# Photos: keeping time and location
+# Photos without time or location
 
-Phones store time and GPS inside the photo (Exif) only if the camera has location access, and many apps strip it
-on upload. Say this kindly, once, and give the matching tip. Name menus in Bulgarian with the English label in
-parentheses: most phones in Bulgaria run in English.
+Missing metadata is normal and never the user's fault: the Claude app on iPhone drops it when photos are added with
+„+“ → Photos, and messengers strip it too. Never lecture and never ask the user to change how they attach photos.
+Ask one short question with your own guesses filled in, then move on:
 
-- **Camera location**:
-  - iPhone: Настройки → Поверителност и сигурност → Услуги за местоположение → Камера → „Докато се използва“
-    (Settings → Privacy & Security → Location Services → Camera → While Using the App).
-  - Android: camera → ⚙️ → „Етикети за местоположение“ / „Запазване на местоположението“ (Location tags on
-    Samsung, Save location on Pixel).
-- **iPhone → Claude app**: if location is missing, share from Снимки → Споделяне → „Опции“ → „Местоположение“ → Claude
-  (Photos → Share → Options → Location → Claude).
-- **Android → Claude app**: the system photo picker removes location from photos it hands to apps. In Claude tap „+“ →
-  Файлове, not Снимки (Files, not Photos) → DCIM → Camera, or share from Google Снимки (Google Photos) → Claude.
-- **Messengers** (Viber, WhatsApp, Messenger, Telegram) strip metadata. Use the originals from the phone.
-- Screenshots have no GPS.
+> Снимките идват без час и място (приложението ги изтрива). Виждам табела „ул. …“ – правилно ли е и с коя пресечка
+> или номер? И кога: „сега“ или напр. „вчера 18:30“?
 
-No location at all is fine: ask for the street and number or the intersection, or a map pin. In Google Maps,
-long-press the spot (a „Пуснат пин“ / Dropped pin appears), tap the coordinates to copy them, and paste them here.
+- "сега" / "now": use the current Bulgarian local time, rounded to the minute.
+- If the photo was taken earlier and the user doesn't remember: on iPhone, swiping up on the photo in the Photos app
+  shows its date, time and place (Снимки → плъзнете нагоре / Photos → swipe up); on Android, the ⓘ (Details) button in the
+  gallery does the same.
+- Place: a street name, an intersection, a landmark or a Google Maps pin are all fine. Combine it with signs and house
+  numbers you can read in the photos.
+
+Only if the user asks how to keep time and place in the photos next time:
+- Camera location must be on: iPhone Настройки → Поверителност и сигурност → Услуги за местоположение → Камера
+  (Settings → Privacy & Security → Location Services → Camera); Android camera ⚙️ → „Етикети за местоположение“ /
+  „Запазване на местоположението“ (Location tags / Save location).
+- Sharing from the gallery app to Claude (Share → Claude) may keep more than „+“ → Photos; on iPhone turn on
+  „Опции“ → „Местоположение“ (Options → Location) in the share sheet.
+- A .zip of the original photos always keeps everything (scripts/exif.py reads zips), but only suggest it to someone
+  who asks for exact GPS.
 
 Good photos for a report: one wide shot showing the car and what it blocks (crossing, ramp, sign, sidewalk),
-one close-up where the plate is readable. Night photos: avoid flash glare on the plate.
+one close-up where the plate is readable.
