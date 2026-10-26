@@ -51,15 +51,22 @@ flowchart LR
 
 ## Plugins
 
-| Plugin | Skills | Status |
-|---|---|---|
-| 🆕 **[civic](plugins/civic)** | **[`podai-globata`](plugins/civic/skills/podai-globata/README.md)** (Подай глобата: photos of a wrongly parked car in Bulgaria → a formal report to the right authority, from the phone; [zdravkov.dev/podai-globata](https://zdravkov.dev/podai-globata)) | ✅ |
-| [foundation](plugins/foundation) | `doctor`, `new-machine`, `ship-public`, `kaizen` | ✅ |
-| [homelab](plugins/homelab) | `homelab-check` (daily, notifies), `system-updates`, `tv` (Android TV over adb: apps from official sources, weekly updates) | ✅ |
-| [career](plugins/career) | `job-digest` (headless weekday run, no sending; ranked digest in a phone app with push and marks) | ✅ |
-| [retro](plugins/retro) | `rom-library` (audit, CHD/RVZ, playlists), `rom-sync` (adb / SD card) | ✅ |
-| [health](plugins/health) | `daily-coach` (ring/Apple Health → a tiny gamified daily plan in a phone app with push, check-ins, XP, trends, seasonal recipe) | ✅ |
-| kitchen, training | planned: a seasonal chef and a training buddy (see the [roadmap](docs/roadmap.md)) | 📝 ToDo |
+| Plugin | Skill | What it does | Status |
+|---|---|---|---|
+| 🆕 **[civic](plugins/civic)** | **[`podai-globata`](plugins/civic/skills/podai-globata/README.md)** | Подай глобата: photos of a wrongly parked car in Bulgaria → a formal report to the right authority, from the phone ([zdravkov.dev/podai-globata](https://zdravkov.dev/podai-globata)) | ✅ |
+| [foundation](plugins/foundation) | [`doctor`](plugins/foundation/skills/doctor) | health-check of the whole setup: toolchain, auth, git hooks, leak guards, overlay | ✅ |
+|  | [`new-machine`](plugins/foundation/skills/new-machine) | set up or migrate the environment onto a fresh Linux machine | ✅ |
+|  | [`ship-public`](plugins/foundation/skills/ship-public) | safe publishing: branch, leak scan, gitleaks, tests, security review, PR, auto-merge | ✅ |
+|  | [`kaizen`](plugins/foundation/skills/kaizen) | continuous-improvement pass after every task | ✅ |
+| [homelab](plugins/homelab) | [`homelab-check`](plugins/homelab/skills/homelab-check) | daily machine health check with notifications: updates, disks, SMART, mounts, services, tailnet | ✅ |
+|  | [`system-updates`](plugins/homelab/skills/system-updates) | updates across every layer of an atomic Fedora / Bazzite machine | ✅ |
+|  | [`tv`](plugins/homelab/skills/tv) | Android TV over adb: apps from official sources, weekly updates | ✅ |
+| [career](plugins/career) | [`job-digest`](plugins/career/skills/job-digest) | headless weekday run, no sending; ranked digest in a phone app with push and marks | ✅ |
+| [retro](plugins/retro) | [`rom-library`](plugins/retro/skills/rom-library) | audit the ROM library: CHD/RVZ, playlists, 50 Hz, duplicates | ✅ |
+|  | [`rom-sync`](plugins/retro/skills/rom-sync) | mirror systems to a device over adb or to an SD card | ✅ |
+| [health](plugins/health) | [`daily-coach`](plugins/health/skills/daily-coach) | ring/Apple Health → a tiny gamified daily plan in a phone app with push, check-ins, XP, trends, seasonal recipe | ✅ |
+| kitchen | chef | seasonal, locally available recipes, pantry-aware ([roadmap](docs/roadmap.md)) | 📝 ToDo |
+| training | training buddy | progressive overload plans and calendar events ([roadmap](docs/roadmap.md)) | 📝 ToDo |
 
 ## Use it
 
