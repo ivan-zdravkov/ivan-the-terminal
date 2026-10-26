@@ -2,33 +2,46 @@
 
 🚗📸 **Photograph a wrongly parked car in Bulgaria, send the photos to Claude, and get a formal report to the right authority a minute later.**
 
-A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop. It reads time and GPS from the photos, recognises the plate, make and violations, finds the address or intersection, and routes the report (Sofia: the Urban Mobility Centre, with the city police in copy). It then writes a formal Bulgarian email citing the Road Traffic Act. You check it, attach the photos and send.
+Free · Android, iPhone and desktop · all you need is a [Claude](https://claude.ai) account (the free plan works)
 
-[Българска версия](README.md) · Share link: **[zdravkov.dev/podai-globata](https://zdravkov.dev/podai-globata)**
-
-**Contents**
-
-- [What it does](#what-it-does)
-- [Example email](#example-email)
-- [Limitations](#limitations)
-- [Witnesses](#witnesses)
-- [Install](#install)
-- [Privacy](#privacy)
-- [Contribute authority emails](#contribute-authority-emails)
-- [Replaces](#replaces)
+[How it works](#how-it-works) · [Install](#install-3-minutes-once) · [Example email](#example-email) · [Important](#important-before-your-first-report) · [Questions](#questions) · [Български](README.md)
 
 Useful? **[⭐ Star it on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal)** (the **Star** button, top right) so more people find it.
 
-## What it does
-- **Photos → facts:** date, time and location from Exif; plate, make, model and colour from the image. `scripts/exif.py` is stdlib-only and reads JPEG, HEIC, PNG and WebP.
-- **Violations with legal basis:** crossings, intersections, sidewalks without 2 m for pedestrians, tactile paving, ramps, disabled bays, bike lanes, stops, double parking and more. Each maps to the Road Traffic Act as amended in 2025 ([violations.md](references/violations.md)).
-- **Address and recipients:** OpenStreetMap reverse geocoding plus the nearest intersection. The municipality's parking control (art. 167(2) ЗДвП) is the recipient and the regional police goes in copy ([authorities.json](references/authorities.json), each address with its source and confidence).
-- **A report that gets processed:** it has the sender's full name and contact (anonymous reports are dropped). It asks for an incoming number and a written answer within the statutory two months, and offers to testify as a witness.
-- **Delivery:** a Gmail draft if Gmail is connected, otherwise a `mailto:` link that opens the phone's mail app. Copyable text either way.
+## How it works
+
+1. **Photograph the car:** one wide shot that shows the violation, and one close-up where the plate is readable.
+2. **Send the photos to Claude** in a new chat. No need to type anything.
+3. **Check the finished email**, attach the photos and send.
+
+Claude finds the date, time and place, the plate and make, the violations with the article of the law, and the right authority (Sofia: the Urban Mobility Centre, with the city police in copy). If anything is missing, it asks.
+
+## Install (3 minutes, once)
+
+Easiest from a desktop browser. After that the skill works everywhere, including the Claude phone app.
+
+1. On [claude.ai](https://claude.ai), open **Settings → Capabilities** and turn on **Code execution and file creation**.
+2. Open **Customize → Plugins → Add → Add marketplace → Add from a repository**, enter `ivan-zdravkov/ivan-the-terminal` and confirm.
+3. In **Discover**, pick **civic** → **Add**. The other plugins in the list aren't needed.
+4. *(Recommended)* **Settings → Connectors → Gmail → Connect**, to get a ready draft in Gmail.
+
+Done. On a phone, close and reopen the Claude app. Plugins need a paid plan (Pro, Max, Team); on the free plan, use the .zip below.
+
+<details>
+<summary>Other ways: free plan (.zip file), Claude Code, more accurate addresses</summary>
+
+- **Free plan (.zip file):** after step 1, download **[podai-globata.zip](https://github.com/ivan-zdravkov/ivan-the-terminal/releases/download/podai-globata/podai-globata.zip)** (don't unzip it), then **Customize → Skills → „+“ → Create skill → Upload a skill** and pick the file. Works on every plan.
+- **Claude Code:** `/plugin marketplace add ivan-zdravkov/ivan-the-terminal`, then `/plugin install civic@ivan-the-terminal`.
+- **More accurate addresses:** in the Code execution settings, allow network access to `nominatim.openstreetmap.org` and `overpass-api.de` (OpenStreetMap). Without it, Claude reads the address from street signs in the photo or asks you.
+
+</details>
 
 ## Example email
 
-The finished report for a car on the sidewalk next to an intersection (fictional sender). The email is always in Bulgarian; Claude shows it to you before anything is sent.
+A car on the sidewalk next to an intersection, with a fictional sender. The email is always in Bulgarian, and Claude shows it to you before anything is sent.
+
+<details>
+<summary><b>To:</b> Urban Mobility Centre · <b>Cc:</b> Sofia traffic police · <b>Subject:</b> report of a wrongly parked car, CA1234AB, Граф Игнатиев / Солунска (tap to see the whole email)</summary>
 
 > **До:** office@sofiatraffic.bg (ЦГМ)<br>
 > **Копие:** trafficpolicesdvr@mvr.bg (СДВР – „Пътна полиция“)<br>
@@ -65,43 +78,88 @@ The finished report for a car on the sidewalk next to an intersection (fictional
 >
 > 📎 *2 прикачени снимки*
 
-## Limitations
-- **Claude can't attach the photos: the sender must attach the original photos before sending.** The Gmail connector can't carry chat images reliably. Without photos the report is weak, and the untouched originals (with time and location) are the best evidence.
-- Some phones and apps strip GPS on upload (Android's photo picker, messengers). Claude then asks for the address.
-- Not every authority address is confirmed; unconfirmed ones are checked by web search when available, or flagged.
-- Plate, make and violations are read from the image; always check the preview. Bulgaria only; not legal advice.
+</details>
 
-## Witnesses
-A fine needs an official act drawn up in the presence of witnesses to the violation (art. 40(1) of the Administrative Violations Act). The car's owner answers for the violation (art. 188 of the Road Traffic Act), so a fine can be issued from the photos without anyone visiting the spot days later. The email therefore asks for the act and the fine based on the photos and the sender's eyewitness testimony, and says the sender is willing to testify. **For real action, the sender may be called as a witness.**
+## Important before your first report
 
-## Install
-**A. From GitHub, no zip (paid plans: Pro, Max, Team):** claude.ai → Customize → Plugins → Add → Add marketplace → Add from a repository → `ivan-zdravkov/ivan-the-terminal` → in Discover, add **civic**.
+- **📎 Attach the original photos yourself before sending.** Claude can't attach them to the email, and without them the report is weak.
+- **👮 You may be asked to act as a witness.** That's what lets the authority fine from the photos, without an on-site check days later.
+- **Check the plate and violations** in the preview: Claude reads them from the photo.
+- **Bulgaria only.** This isn't legal advice.
 
-**B. Zip upload (all plans, including Free):** download [podai-globata.zip](https://github.com/ivan-zdravkov/ivan-the-terminal/releases/download/podai-globata/podai-globata.zip) → Customize → Skills → + → Create skill → Upload a skill.
+## Questions
 
-**Both:**
-- Settings → Capabilities → enable *Code execution and file creation*.
-- Optional: connect Gmail, and allow code-execution network access to `nominatim.openstreetmap.org` and `overpass-api.de` for automatic addresses.
+<details>
+<summary><b>The photos have no time or location?</b></summary>
 
-**Is the zip safe?** It is plain text: instructions and three short Python scripts, identical to this folder. It never runs on your phone; Claude unpacks it in its own sandbox. You can read every file in Customize → Skills after uploading.
+No problem. The Claude iPhone app and messengers often strip them. Claude reads street signs and house numbers from the photo and asks only for what's missing, e.g. "I see бул. Витоша: which cross street? And when: now, or yesterday 18:30?" If you don't remember, open the photo in your gallery and swipe up (iPhone) or tap ⓘ Details (Android).
 
-**Updates:** zip uploads don't update themselves. Delete the skill and upload the zip again from the same link; watch the repo's Releases to hear about new versions. GitHub installs pick changes up from the repository. Claude Code syncs plugins on every start.
+To make the camera save the location: iPhone → Settings → Privacy & Security → Location Services → Camera; Android → camera → ⚙️ → Location tags / Save location.
 
-**Claude Code:**
-```
-/plugin marketplace add ivan-zdravkov/ivan-the-terminal
-/plugin install civic@ivan-the-terminal
-```
+</details>
 
-## Privacy
-- The sender's name, email and phone are asked once and kept where the user chooses: Claude memory or profile preferences (their own Claude account), or `~/.config/podai-globata/sender.json` in Claude Code.
-- The skill has no server, analytics or tracking, and the author can't see any of it.
-- Only the email the user approves leaves, from their own mailbox. If maps are allowed, only coordinates go to OpenStreetMap.
+<details>
+<summary><b>Who receives the report?</b></summary>
 
-## Contribute authority emails
-An address bounced, or you know the right one for your city? [Open the correction form](https://github.com/ivan-zdravkov/ivan-the-terminal/issues/new?template=authority-email.yml), or send a PR editing `authorities.json`. Link the official page that publishes the address. The form is public, so include no personal data.
+Parking in towns is enforced by the municipality (art. 167(2) of the Road Traffic Act), so the report goes to the municipal service, with the police in copy:
 
-## Replaces
-City signal portals, phone queues and hand-written complaints.
+| City | To | Cc |
+|---|---|---|
+| Sofia | Urban Mobility Centre (ЦГМ) | Sofia traffic police (СДВР) |
+| Sofia, car on a green area | Sofia Inspectorate | СДВР |
+| Plovdiv, Varna, Burgas | the municipal service | the regional police (ОДМВР) |
+| Other towns | the regional police (+ the municipality, if Claude finds its address) | |
+
+Violations follow the Road Traffic Act as amended in September 2025: sidewalks, crossings, intersections, tactile paving, ramps, disabled bays, bike lanes, stops, double parking, in front of garages or schools and more ([violations.md](references/violations.md)).
+
+</details>
+
+<details>
+<summary><b>Why might I be called as a witness?</b></summary>
+
+A fine needs an official act drawn up in the presence of witnesses to the violation (art. 40(1) of the Administrative Violations Act), and the car's owner answers for the violation (art. 188 of the Road Traffic Act). So the email asks for the act based on the photos and your eyewitness testimony. If the authority acts on it, they may call you to sign the act. Without a willing witness, a report rarely ends in a fine.
+
+</details>
+
+<details>
+<summary><b>Where is my personal data kept?</b></summary>
+
+Your full name, email and phone, because anonymous reports aren't processed. Claude asks once and keeps them where you choose: Claude memory or your profile preferences (Settings → Profile), i.e. your own account. In Claude Code, a file on your computer.
+
+**The author has no access** to your data, photos or emails. The skill has no server, database or tracking. Only the email you approve leaves, from your own mailbox, and, if you allowed maps, only coordinates go to OpenStreetMap. Photos and text pass through Claude like any conversation ([Anthropic privacy](https://www.anthropic.com/legal/privacy)).
+
+To delete them, tell Claude "forget the Подай глобата details".
+
+</details>
+
+<details>
+<summary><b>Is the .zip file safe?</b></summary>
+
+Yes. It's plain text: instructions and three short Python scripts, exactly [these on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal/tree/main/plugins/civic/skills/podai-globata). It never installs or runs on your phone: Claude uses it in its own sandbox. The skill does nothing outbound without your explicit yes.
+
+</details>
+
+<details>
+<summary><b>How do I update?</b></summary>
+
+The **Plugins** (GitHub) install and Claude Code update themselves; if you don't see a change, remove and re-add the plugin. An uploaded .zip doesn't: delete the skill in **Customize → Skills** and upload the file again from the same link. To hear about new versions: on GitHub, **Watch → Custom → Releases**.
+
+</details>
+
+<details>
+<summary><b>When will I get an answer?</b></summary>
+
+The authority must answer in writing within **2 months** (art. 121 of the Administrative Procedure Code). If it doesn't, reply in the same thread and ask about the incoming number. Send soon after the violation. If the spot is a chronic problem, say so: the municipality can install bollards. In Sofia you can also file the same report at [call.sofia.bg](https://call.sofia.bg).
+
+</details>
+
+<details>
+<summary><b>The authority's email is wrong?</b></summary>
+
+We can't know the right address for every town in advance ([the list with sources](references/authorities.json)). If the email bounced or the authority replied that it isn't competent, [fill in the short form](https://github.com/ivan-zdravkov/ivan-the-terminal/issues/new?template=authority-email.yml) with the town, the authority and the right email, or send a PR editing `authorities.json`. The form is public: no personal data, plates or photos. The fix ships to everyone in the next version.
+
+</details>
+
+---
 
 **[⭐ Star on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal)** · MIT · part of [ivan-the-terminal](https://github.com/ivan-zdravkov/ivan-the-terminal)
