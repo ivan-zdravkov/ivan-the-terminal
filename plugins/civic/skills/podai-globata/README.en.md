@@ -1,6 +1,6 @@
-# 🚗📸 Podai globata (Подай глобата)
+# Podai globata (Подай глобата)
 
-**Photograph a wrongly parked car in Bulgaria, send the photos to Claude, and get a formal report to the right authority a minute later.**
+🚗📸 **Photograph a wrongly parked car in Bulgaria, send the photos to Claude, and get a formal report to the right authority a minute later.**
 
 A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop. It reads time and GPS from the photos, recognises the plate, make and violations, finds the address or intersection, and routes the report (Sofia: the Urban Mobility Centre, with the city police in copy). It then writes a formal Bulgarian email citing the Road Traffic Act. You check it, attach the photos and send.
 
