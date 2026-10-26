@@ -3,3 +3,6 @@
 ivan@zdravkov\.dev
 # LinkedIn system senders (public, identical for every user; the job digest filters on them)
 (?:inmail-hit-reply|messaging-digest-noreply|jobalerts-noreply|jobs-listings|jobs-noreply)@linkedin\.com
+# Public Bulgarian authority mailboxes (podai-globata routes parking reports to them; published by the institutions)
+[\w.-]+@(?:mvr|sofiatraffic|plovdiv|varna|burgas)\.bg
+[\w.-]+@inspectorat-so\.org
