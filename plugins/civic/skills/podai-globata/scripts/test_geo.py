@@ -75,7 +75,9 @@ class Mailto(unittest.TestCase):
 
     def test_rejects_bad_addresses(self):
         for msg in ({"to": []}, {"to": ["not-an-email"]}, {"to": ["a@example.com"], "cc": ["x@y"]},
-                    {"to": ["a@example.com?bcc=evil@example.com"]}):
+                    {"to": ["a@example.com?bcc=evil@example.com"]},
+                    {"to": ["a@example.com?bcc=evil%40example.com&x=y.example.com"]},
+                    {"to": ["a@example.com&cc=c%40example.com"]}):
             with self.assertRaises(ValueError):
                 mailto.build(msg)
 

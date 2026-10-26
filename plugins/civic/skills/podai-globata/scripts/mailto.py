@@ -11,7 +11,7 @@ import re
 import sys
 from urllib.parse import quote
 
-EMAIL = re.compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[A-Za-z]{2,}$")
+EMAIL = re.compile(r"^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")  # no ? & = %: they'd smuggle URL params
 LONG = 8000
 
 
