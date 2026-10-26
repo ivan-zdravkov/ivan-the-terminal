@@ -9,6 +9,7 @@ A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop
 **Contents**
 
 - [What it does](#what-it-does)
+- [Example email](#example-email)
 - [Limitations](#limitations)
 - [Witnesses](#witnesses)
 - [Install](#install)
@@ -22,6 +23,45 @@ A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop
 - **Address and recipients:** OpenStreetMap reverse geocoding plus the nearest intersection. The municipality's parking control (art. 167(2) ЗДвП) is the recipient and the regional police goes in copy ([authorities.json](references/authorities.json), each address with its source and confidence).
 - **A report that gets processed:** it has the sender's full name and contact (anonymous reports are dropped). It asks for an incoming number and a written answer within the statutory two months, and offers to testify as a witness.
 - **Delivery:** a Gmail draft if Gmail is connected, otherwise a `mailto:` link that opens the phone's mail app. Copyable text either way.
+
+## Example email
+
+The finished report for a car on the sidewalk next to an intersection (fictional sender). The email is always in Bulgarian; Claude shows it to you before anything is sent.
+
+> **До:** office@sofiatraffic.bg (ЦГМ)<br>
+> **Копие:** trafficpolicesdvr@mvr.bg (СДВР – „Пътна полиция“)<br>
+> **Тема:** Сигнал за неправилно паркиране – CA1234AB, ул. „Граф Игнатиев“ / ул. „Солунска“, 25.10.2026 18:42
+>
+> Уважаеми госпожи и господа,
+>
+> Подавам сигнал за неправилно паркиран автомобил, на който съм очевидец:
+>
+> Дата и час: 25.10.2026 г., 18:42 ч. (по данни от снимките)<br>
+> Място: кръстовището на ул. „Граф Игнатиев“ и ул. „Солунска“, гр. София<br>
+> GPS координати: 42.69213, 23.32283 (точност около 5 м)<br> <!-- leakguard:allow (example: public intersection) -->
+> Карта: https://maps.google.com/?q=42.69213,23.32283<br> <!-- leakguard:allow (example: public intersection) -->
+> Превозно средство: Volkswagen Golf, сив, рег. № CA1234AB
+>
+> Нарушения:
+> 1. Паркиране върху тротоар извън обозначените места, без да остават 2 м за пешеходците – чл. 94, ал. 3; чл. 183, ал. 2, т. 1 ЗДвП;
+> 2. Паркиране на по-малко от 5 м от кръстовище – чл. 98, ал. 1, т. 6; чл. 183, ал. 4, т. 8 ЗДвП.
+>
+> Прилагам 2 бр. снимки (оригинални файлове с дата, час и местоположение).
+>
+> Моля:
+> 1. Въз основа на приложените снимки и моите показания като очевидец да съставите акт за установяване на административно нарушение и да наложите предвидената в ЗДвП санкция на собственика или ползвателя на автомобила (чл. 188 ЗДвП).
+> 2. Да ми съобщите входящия номер на сигнала.
+> 3. Да ме уведомите писмено за предприетите действия в законоустановения срок (чл. 121 и чл. 123 от АПК).
+>
+> Заявявам готовност да бъда свидетел при съставянето на акта (чл. 40, ал. 1 от ЗАНН) и да предоставя снимките в оригинал.
+> Ако сигналът не е от Вашата компетентност, моля да го препратите на компетентния орган съгласно чл. 112 от АПК.
+>
+> С уважение,<br>
+> Мария Петрова Иванова<br>
+> Тел.: 08XX XXX XXX<br>
+> Имейл: maria@example.com
+>
+> 📎 *2 прикачени снимки*
 
 ## Limitations
 - **Claude can't attach the photos: the sender must attach the original photos before sending.** The Gmail connector can't carry chat images reliably. Without photos the report is weak, and the untouched originals (with time and location) are the best evidence.
