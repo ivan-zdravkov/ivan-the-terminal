@@ -1,6 +1,8 @@
 # ivan-the-terminal
 
-> A self-hosted copilot that lives in my terminal. Claude Code skills that keep my home infrastructure in order, my retro game library playable and streamable, my job search moving, my kitchen fed and my training on track. Each one is built to replace a subscription.
+> A self-hosted copilot that lives in my terminal. Claude Code skills that keep my home infrastructure in order, my retro game library playable and streamable, my job search moving and my health on track, plus civic tools anyone can use. Each one is built to replace a subscription.
+
+> 🆕 **[Подай глобата](https://zdravkov.dev/podai-globata)**: photograph a wrongly parked car in Bulgaria, and Claude writes the formal report to the right authority, with GPS, address, plate and the article of the law. A free, open-source Claude skill that runs on your phone. [Bulgarian page](plugins/civic/skills/podai-globata/README.md) · [English](plugins/civic/skills/podai-globata/README.en.md)
 
 The name? Ivan the Terrible had secrets. This repo is **Ivan the Terminal**: everything that's safe to share. The secrets live in a private sibling.
 
@@ -51,13 +53,13 @@ flowchart LR
 
 | Plugin | Skills | Status |
 |---|---|---|
+| 🆕 **[civic](plugins/civic)** | **[`podai-globata`](plugins/civic/skills/podai-globata/README.md)** (Подай глобата: photos of a wrongly parked car in Bulgaria → a formal report to the right authority, from the phone; [zdravkov.dev/podai-globata](https://zdravkov.dev/podai-globata)) | ✅ |
 | [foundation](plugins/foundation) | `doctor`, `new-machine`, `ship-public`, `kaizen` | ✅ |
-| [homelab](plugins/homelab) | `homelab-check` (daily, notifies), `system-updates` | ✅ |
+| [homelab](plugins/homelab) | `homelab-check` (daily, notifies), `system-updates`, `tv` (Android TV over adb: apps from official sources, weekly updates) | ✅ |
 | [career](plugins/career) | `job-digest` (headless weekday run, no sending; ranked digest in a phone app with push and marks) | ✅ |
 | [retro](plugins/retro) | `rom-library` (audit, CHD/RVZ, playlists), `rom-sync` (adb / SD card) | ✅ |
 | [health](plugins/health) | `daily-coach` (ring/Apple Health → a tiny gamified daily plan in a phone app with push, check-ins, XP, trends, seasonal recipe) | ✅ |
-| [civic](plugins/civic) | `podai-globata` (Подай глобата: photos of a wrongly parked car in Bulgaria → a formal report to the right authority, from the phone; [Bulgarian setup page](plugins/civic/skills/podai-globata/README.md)) | ✅ |
-| kitchen, training, … | see the [roadmap](docs/roadmap.md) | 🛠️ |
+| kitchen, training | planned: a seasonal chef and a training buddy (see the [roadmap](docs/roadmap.md)) | 📝 ToDo |
 
 ## Use it
 
