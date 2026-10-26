@@ -21,15 +21,16 @@ Claude сам намира датата, часа и мястото, номер�
 Най-лесно е от браузър на компютъра. После умението работи навсякъде, включително в приложението Claude на телефона. Менютата в claude.ai са на английски.
 
 1. На [claude.ai](https://claude.ai) отворете **Settings → Capabilities** и включете **Code execution and file creation**.
-2. Изтеглете **[podai-globata.zip](https://github.com/ivan-zdravkov/ivan-the-terminal/releases/download/podai-globata/podai-globata.zip)** (не го разархивирайте), после **Customize → Skills → „+“ → Create skill → Upload a skill** и изберете файла.
-3. *(Препоръчително)* **Settings → Connectors → Gmail → Connect**, за да получавате готова чернова в Gmail.
+2. Отворете **Customize → Plugins → Add → Add marketplace → Add from a repository**, въведете `ivan-zdravkov/ivan-the-terminal` и потвърдете.
+3. В **Discover** изберете **civic** → **Add**. Другите плъгини в списъка не са нужни.
+4. *(Препоръчително)* **Settings → Connectors → Gmail → Connect**, за да получавате готова чернова в Gmail.
 
-Готово. Ако ползвате телефона, затворете и отворете отново приложението Claude.
+Готово. Ако ползвате телефона, затворете и отворете отново приложението Claude. Плъгините са за платените планове (Pro, Max, Team); с безплатен акаунт ползвайте .zip файла отдолу.
 
 <details>
-<summary>Други начини: директно от GitHub (платен план), Claude Code, по-точен адрес</summary>
+<summary>Други начини: безплатен план (.zip файл), Claude Code, по-точен адрес</summary>
 
-- **Без .zip файл (Pro, Max, Team):** **Customize → Plugins → Add → Add marketplace → Add from a repository** → `ivan-zdravkov/ivan-the-terminal` → в **Discover** добавете **civic**.
+- **Безплатен план (.zip файл):** след стъпка 1 изтеглете **[podai-globata.zip](https://github.com/ivan-zdravkov/ivan-the-terminal/releases/download/podai-globata/podai-globata.zip)** (не го разархивирайте), после **Customize → Skills → „+“ → Create skill → Upload a skill** и изберете файла. Работи на всички планове.
 - **Claude Code:** `/plugin marketplace add ivan-zdravkov/ivan-the-terminal`, после `/plugin install civic@ivan-the-terminal`.
 - **По-точен адрес:** в настройките на Code execution разрешете мрежов достъп до `nominatim.openstreetmap.org` и `overpass-api.de` (картите на OpenStreetMap). Без това Claude чете адреса от табелите на снимката или ви пита.
 
@@ -141,7 +142,7 @@ Claude сам намира датата, часа и мястото, номер�
 <details>
 <summary><b>Как да обновя умението?</b></summary>
 
-Качен .zip файл не се обновява сам. Изтрийте умението от **Customize → Skills** и качете отново файла от същия линк. За известия за нова версия: в GitHub **Watch → Custom → Releases**. Инсталацията директно от GitHub и Claude Code се обновяват сами.
+Инсталацията през **Plugins** (от GitHub) и Claude Code се обновяват сами; ако не виждате промяна, премахнете и добавете плъгина отново. Качен .zip файл не се обновява сам: изтрийте умението от **Customize → Skills** и качете отново файла от същия линк. За известия за нова версия: в GitHub **Watch → Custom → Releases**.
 
 </details>
 
