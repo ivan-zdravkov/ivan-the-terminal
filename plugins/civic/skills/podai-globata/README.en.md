@@ -4,7 +4,7 @@
 
 A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop. It reads time and GPS from the photos, recognises the plate, make and violations, finds the address or intersection, and routes the report (Sofia: the Urban Mobility Centre, with the city police in copy). It then writes a formal Bulgarian email citing the Road Traffic Act. You check it, attach the photos and send.
 
-[Българска версия](README.md)
+[Българска версия](README.md) · Share link: **[zdravkov.dev/podai-globata](https://zdravkov.dev/podai-globata)**
 
 **Contents**
 
@@ -18,8 +18,8 @@ A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop
 
 ## What it does
 - **Photos → facts:** date, time and location from Exif; plate, make, model and colour from the image. `scripts/exif.py` is stdlib-only and reads JPEG, HEIC, PNG and WebP.
-- **Violations with legal basis:** crossings, intersections, sidewalks without 2 m for pedestrians, tactile paving, ramps, disabled bays, bike lanes, stops, double parking and more. Each maps to the Road Traffic Act as amended in 2025 ([violations.md](skills/podai-globata/references/violations.md)).
-- **Address and recipients:** OpenStreetMap reverse geocoding plus the nearest intersection. The municipality's parking control (art. 167(2) ЗДвП) is the recipient and the regional police goes in copy ([authorities.json](skills/podai-globata/references/authorities.json), each address with its source and confidence).
+- **Violations with legal basis:** crossings, intersections, sidewalks without 2 m for pedestrians, tactile paving, ramps, disabled bays, bike lanes, stops, double parking and more. Each maps to the Road Traffic Act as amended in 2025 ([violations.md](references/violations.md)).
+- **Address and recipients:** OpenStreetMap reverse geocoding plus the nearest intersection. The municipality's parking control (art. 167(2) ЗДвП) is the recipient and the regional police goes in copy ([authorities.json](references/authorities.json), each address with its source and confidence).
 - **A report that gets processed:** it has the sender's full name and contact (anonymous reports are dropped). It asks for an incoming number and a written answer within the statutory two months, and offers to testify as a witness.
 - **Delivery:** a Gmail draft if Gmail is connected, otherwise a `mailto:` link that opens the phone's mail app. Copyable text either way.
 
