@@ -30,7 +30,7 @@ A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop
 - Plate, make and violations are read from the image; always check the preview. Bulgaria only; not legal advice.
 
 ## Witnesses
-A fine needs an official act drawn up in the presence of witnesses to the violation (art. 40(1) of the Administrative Violations Act). Photo-only reports often end with "no violation found" because the car has left. The email therefore states that the sender saw it and is willing to testify. **For real action, the sender may be called as a witness.**
+A fine needs an official act drawn up in the presence of witnesses to the violation (art. 40(1) of the Administrative Violations Act). The car's owner answers for the violation (art. 188 of the Road Traffic Act), so a fine can be issued from the photos without anyone visiting the spot days later. The email therefore asks for the act and the fine based on the photos and the sender's eyewitness testimony, and says the sender is willing to testify. **For real action, the sender may be called as a witness.**
 
 ## Install
 **A. From GitHub, no zip (paid plans: Pro, Max, Team):** claude.ai → Customize → Plugins → Add → Add marketplace → Add from a repository → `ivan-zdravkov/ivan-the-terminal` → in Discover, add **civic**.
