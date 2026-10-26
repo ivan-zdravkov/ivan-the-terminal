@@ -25,7 +25,8 @@ def package(skill, out):
     out.mkdir(parents=True, exist_ok=True)
     dest = out / f"{skill.name}.zip"
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in sorted(p for p in skill.rglob("*") if p.is_file() and wanted(p.relative_to(skill))):
+        for f in sorted(p for p in skill.rglob("*")
+                        if p.is_file() and not p.is_symlink() and wanted(p.relative_to(skill))):
             info = zipfile.ZipInfo(f"{skill.name}/{f.relative_to(skill).as_posix()}", FIXED)
             info.external_attr = (0o755 if f.stat().st_mode & 0o100 else 0o644) << 16
             info.compress_type = zipfile.ZIP_DEFLATED
