@@ -29,9 +29,9 @@ Only claim what a photo shows. If something isn't certain (e.g. whether it's 5 m
 Notes:
 - "Тротоар" (§ 6, т. 6) is only for pedestrians; parking there is allowed only where the owner of the road marked it, for
   cars ≤ 2.5 t, parallel to the road, leaving 2 m (чл. 94, ал. 3). No marked bay = violation.
-- The owner (or the registered user) answers for the violation unless they name the driver (чл. 188).
-- Towing (`паяк`) is a measure the municipality's control service or the police may apply (чл. 167, ал. 2, т. 2;
-  чл. 168). Ask for it when the car blocks a crossing, a ramp, tactile paving, a stop or a garage.
+- The owner (or the registered user) answers for the violation unless they name the driver (чл. 188). That is why the
+  email asks for the act against the owner, based on the photos and the sender's testimony: no on-site check needed.
+- Don't ask for towing (`паяк`) in the email: it needs a patrol on site. Mention it only if the user explicitly wants it.
 - Bulgarian plates: 1–2 region letters, 4 digits, 2 letters (e.g. `CA 1234 AB`). They use only the Latin letters that look
   Cyrillic: A B E K M H O P C T Y X. Write plates in Latin capitals, no spaces: `CA1234AB`. Foreign plates are fine; give
   the country.
