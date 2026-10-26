@@ -6,6 +6,8 @@ A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop
 
 [Българска версия](README.md) · Share link: **[zdravkov.dev/podai-globata](https://zdravkov.dev/podai-globata)**
 
+[![GitHub stars](https://img.shields.io/github/stars/ivan-zdravkov/ivan-the-terminal?style=social)](https://github.com/ivan-zdravkov/ivan-the-terminal) Useful? **[⭐ Star it on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal)** (the **Star** button, top right) so more people find it.
+
 **Contents**
 
 - [What it does](#what-it-does)
@@ -102,4 +104,4 @@ An address bounced, or you know the right one for your city? [Open the correctio
 ## Replaces
 City signal portals, phone queues and hand-written complaints.
 
-MIT · part of [ivan-the-terminal](https://github.com/ivan-zdravkov/ivan-the-terminal)
+**[⭐ Star on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal)** · MIT · part of [ivan-the-terminal](https://github.com/ivan-zdravkov/ivan-the-terminal)
