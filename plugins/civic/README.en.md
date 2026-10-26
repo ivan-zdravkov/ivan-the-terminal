@@ -23,11 +23,17 @@ A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop
 A fine needs an official act drawn up in the presence of witnesses to the violation (art. 40(1) of the Administrative Violations Act). Photo-only reports often end with "no violation found" because the car has left. The email therefore states that the sender saw it and is willing to testify. **For real action, the sender may be called as a witness.**
 
 ## Install
-**claude.ai (also works in the mobile apps):**
-1. Download [podai-globata.zip](https://github.com/ivan-zdravkov/ivan-the-terminal/releases/download/podai-globata/podai-globata.zip).
-2. Settings → Capabilities → enable *Code execution and file creation*.
-3. Customize → Skills → + → Create skill → Upload a skill.
-4. Optional: connect Gmail, and allow code-execution network access to `nominatim.openstreetmap.org` and `overpass-api.de` for automatic addresses.
+**A. From GitHub, no zip (paid plans: Pro, Max, Team):** claude.ai → Customize → Plugins → Add → Add marketplace → Add from a repository → `ivan-zdravkov/ivan-the-terminal` → in Discover, add **civic**.
+
+**B. Zip upload (all plans, including Free):** download [podai-globata.zip](https://github.com/ivan-zdravkov/ivan-the-terminal/releases/download/podai-globata/podai-globata.zip) → Customize → Skills → + → Create skill → Upload a skill.
+
+**Both:**
+- Settings → Capabilities → enable *Code execution and file creation*.
+- Optional: connect Gmail, and allow code-execution network access to `nominatim.openstreetmap.org` and `overpass-api.de` for automatic addresses.
+
+**Is the zip safe?** It is plain text: instructions and three short Python scripts, identical to this folder. It never runs on your phone; Claude unpacks it in its own sandbox. You can read every file in Customize → Skills after uploading.
+
+**Updates:** zip uploads don't update themselves. Delete the skill and upload the zip again from the same link; watch the repo's Releases to hear about new versions. GitHub installs pick changes up from the repository. Claude Code syncs plugins on every start.
 
 **Claude Code:**
 ```
