@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 """Read time and GPS from photos. Stdlib only, so it runs in any Claude sandbox.
 
-  exif.py PHOTO [PHOTO...]
+  exif.py PHOTO|ZIP [PHOTO|ZIP...]
 
 Works on JPEG, HEIC/HEIF, PNG and WebP: it finds the embedded TIFF/Exif block instead of parsing each
-container. Prints one JSON object: per-photo results plus a summary (first GPS fix, earliest time, spread).
+container. A .zip is read in memory (never extracted): phone apps re-encode photos and drop their metadata,
+but they pass archives through untouched. Prints one JSON object: per-photo results plus a summary
+(best GPS fix, earliest time, spread).
 """
 import json
 import math
 import struct
 import sys
+import zipfile
 from pathlib import Path
 
 TYPE_SIZE = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8}
 EXIF_IFD, GPS_IFD = 0x8769, 0x8825
 WANT = {0x010F: "make", 0x0110: "model", 0x0132: "datetime", 0x9003: "taken", 0x9011: "offset_taken",
         0x9010: "offset"}
+IMAGE_EXT = (".jpg", ".jpeg", ".heic", ".heif", ".png", ".webp", ".dng", ".tif", ".tiff")
+MAX_MEMBER = 64 * 1024 * 1024
 GPS = {1: "lat_ref", 2: "lat", 3: "lon_ref", 4: "lon", 7: "gps_time", 0x10: "dir_ref", 0x11: "direction",
        0x1D: "gps_date", 0x1F: "accuracy"}
 
@@ -102,12 +107,35 @@ def dms(v, ref):
     return round(-deg if str(ref).upper() in ("S", "W") else deg, 6)
 
 
-def read(path):
-    res = {"file": str(path)}
+def read_zip(path):
+    out = []
+    with zipfile.ZipFile(path) as z:
+        for m in z.infolist():
+            name = m.filename
+            if m.is_dir() or "__MACOSX" in name or not name.lower().endswith(IMAGE_EXT):
+                continue
+            if m.file_size > MAX_MEMBER:
+                out.append({"file": f"{path}:{name}", "error": "too large"})
+                continue
+            out.append(parse(f"{path}:{name}", z.read(m)))
+    return out or [{"file": str(path), "warning": "no photos inside the zip"}]
+
+
+def read_all(path):
     try:
-        data = Path(path).read_bytes()
-    except OSError as e:
-        return res | {"error": str(e)}
+        if zipfile.is_zipfile(path):
+            return read_zip(path)
+        return [parse(str(path), Path(path).read_bytes())]
+    except (OSError, zipfile.BadZipFile, RuntimeError) as e:  # RuntimeError: encrypted zip
+        return [{"file": str(path), "error": str(e)}]
+
+
+def read(path):
+    return read_all(path)[0]
+
+
+def parse(name, data):
+    res = {"file": name}
     t = find_tiff(data)
     if not t:
         return res | {"warning": "no Exif metadata: the app or messenger stripped it"}
@@ -160,7 +188,7 @@ def main(argv):
     if not argv:
         print(__doc__, file=sys.stderr)
         return 2
-    photos = [read(p) for p in argv]
+    photos = [r for p in argv for r in read_all(p)]
     print(json.dumps({"summary": summarize(photos), "photos": photos}, ensure_ascii=False, indent=1))
     return 0
 
