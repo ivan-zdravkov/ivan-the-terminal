@@ -1,0 +1,47 @@
+name: skill-release
+
+# Keeps each skill's claude.ai upload zip current. Opt-in: a skill is published when a release tagged with its name
+# exists (e.g. `podai-globata`), so the download link never changes. The zip is deterministic: it is only re-uploaded
+# when its contents changed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugins/*/skills/**"
+      - "tools/package_skill.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skill-release
+  cancel-in-progress: false
+
+jobs:
+  zips:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload release assets
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rebuild and upload changed zips
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist old
+          for dir in plugins/*/skills/*/; do
+            name=$(basename "$dir")
+            gh release view "$name" >/dev/null 2>&1 || continue
+            python3 -I tools/package_skill.py "$dir" dist >/dev/null
+            if gh release download "$name" -p "$name.zip" -D old --clobber 2>/dev/null && cmp -s "old/$name.zip" "dist/$name.zip"; then
+              echo "$name: unchanged"
+              continue
+            fi
+            gh release upload "$name" "dist/$name.zip" --clobber
+            echo "$name: uploaded sha256 $(sha256sum "dist/$name.zip" | cut -c1-16)"
+          done

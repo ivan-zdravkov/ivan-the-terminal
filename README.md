@@ -56,7 +56,7 @@ flowchart LR
 | [career](plugins/career) | `job-digest` (headless weekday run, no sending; ranked digest in a phone app with push and marks) | ✅ |
 | [retro](plugins/retro) | `rom-library` (audit, CHD/RVZ, playlists), `rom-sync` (adb / SD card) | ✅ |
 | [health](plugins/health) | `daily-coach` (ring/Apple Health → a tiny gamified daily plan in a phone app with push, check-ins, XP, trends, seasonal recipe) | ✅ |
-| [civic](plugins/civic) | `podai-globata` (Подай глобата: photos of a wrongly parked car in Bulgaria → a formal report to the right authority, from the phone; [Bulgarian setup page](plugins/civic/README.md)) | ✅ |
+| [civic](plugins/civic) | `podai-globata` (Подай глобата: photos of a wrongly parked car in Bulgaria → a formal report to the right authority, from the phone; [Bulgarian setup page](plugins/civic/skills/podai-globata/README.md)) | ✅ |
 | kitchen, training, … | see the [roadmap](docs/roadmap.md) | 🛠️ |
 
 ## Use it
