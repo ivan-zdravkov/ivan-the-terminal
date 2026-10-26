@@ -14,8 +14,6 @@
 
 [English version](README.en.md) · Линк за споделяне: **[zdravkov.dev/podai-globata](https://zdravkov.dev/podai-globata)**
 
-[![GitHub stars](https://img.shields.io/github/stars/ivan-zdravkov/ivan-the-terminal?style=social)](https://github.com/ivan-zdravkov/ivan-the-terminal) Полезно ли ви е? **[⭐ Дайте звезда в GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal)** (бутонът **Star** горе вдясно), за да го видят повече хора.
-
 **Съдържание**
 
 - [🔍 Какво прави](#-какво-прави)
@@ -33,6 +31,8 @@
 - [🔒 Личните ви данни](#-личните-ви-данни)
 - [📬 Какво да очаквате](#-какво-да-очаквате)
 - [🤝 Помогнете с имейлите на институциите](#-помогнете-с-имейлите-на-институциите)
+
+[![GitHub stars](https://img.shields.io/github/stars/ivan-zdravkov/ivan-the-terminal?style=social)](https://github.com/ivan-zdravkov/ivan-the-terminal) Полезно ли ви е? **[⭐ Дайте звезда в GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal)** (бутонът **Star** горе вдясно), за да го видят повече хора.
 
 ---
 

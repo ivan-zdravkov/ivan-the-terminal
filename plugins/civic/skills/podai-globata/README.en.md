@@ -6,8 +6,6 @@ A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop
 
 [Българска версия](README.md) · Share link: **[zdravkov.dev/podai-globata](https://zdravkov.dev/podai-globata)**
 
-[![GitHub stars](https://img.shields.io/github/stars/ivan-zdravkov/ivan-the-terminal?style=social)](https://github.com/ivan-zdravkov/ivan-the-terminal) Useful? **[⭐ Star it on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal)** (the **Star** button, top right) so more people find it.
-
 **Contents**
 
 - [What it does](#what-it-does)
@@ -18,6 +16,8 @@ A free [Claude](https://claude.ai) skill for phone (Android, iPhone) and desktop
 - [Privacy](#privacy)
 - [Contribute authority emails](#contribute-authority-emails)
 - [Replaces](#replaces)
+
+[![GitHub stars](https://img.shields.io/github/stars/ivan-zdravkov/ivan-the-terminal?style=social)](https://github.com/ivan-zdravkov/ivan-the-terminal) Useful? **[⭐ Star it on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal)** (the **Star** button, top right) so more people find it.
 
 ## What it does
 - **Photos → facts:** date, time and location from Exif; plate, make, model and colour from the image. `scripts/exif.py` is stdlib-only and reads JPEG, HEIC, PNG and WebP.
