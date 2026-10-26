@@ -25,3 +25,4 @@ __pycache__/
 
 # Claude project MCP config may carry keys
 .mcp.json
+dist/

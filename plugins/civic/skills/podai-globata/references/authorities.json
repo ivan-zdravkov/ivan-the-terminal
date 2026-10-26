@@ -1,0 +1,43 @@
+{
+ "checked": "2026-10-26",
+ "rule": "In towns the municipality's control service enforces stopping and parking (ZDvP art. 167(2)(1)): it is the main recipient, the regional police (MVR) gets a copy. Without a known municipal address the police is the main recipient. confidence: high = read on the institution's own page; medium = from a directory or search snippet, verify when you can.",
+ "municipal": {
+  "Столична": {"name": "Център за градска мобилност ЕАД (ЦГМ)", "email": "office@sofiatraffic.bg", "confidence": "high", "source": "inspectorat-so.org/сигнали: parking on sidewalks and roadways goes to ЦГМ; spasisofia.org"},
+  "Пловдив": {"name": "Общински инспекторат – Пловдив", "email": "inspektorat@plovdiv.bg", "confidence": "medium", "source": "inspektoratplovdiv.bg (controls parking); plovdivzahorata.org"},
+  "Варна": {"name": "ОП „Общински паркинги и синя зона“ – Варна", "email": "bluezone@varna.bg", "confidence": "medium", "source": "varna.bg/bg/435; the city also takes reports at signal.varna.bg"},
+  "Бургас": {"name": "Община Бургас – сигнали", "email": "obshtina@burgas.bg", "confidence": "medium", "source": "burgas.bg/bg/signali"}
+ },
+ "green_area": {
+  "Столична": {"name": "Столичен инспекторат", "email": "delovodstvo@inspectorat-so.org", "confidence": "medium", "source": "inspectorat-so.org FAQ: cars parked on green areas go to Столичен инспекторат"}
+ },
+ "mvr": {
+  "София-град": {"name": "СДВР – отдел „Пътна полиция“", "email": "trafficpolicesdvr@mvr.bg", "confidence": "medium", "source": "mvr.bg/sdvr phone directory of the traffic police department"},
+  "София": {"name": "ОДМВР – София (Софийска област)", "email": "odmvr-sofia@mvr.bg", "confidence": "medium", "source": "ОДМВР-София press releases"},
+  "Пловдив": {"name": "ОДМВР – Пловдив, сектор „Пътна полиция“", "email": "trafficpoliceplovdiv@mvr.bg", "confidence": "high", "source": "mvr.bg/plovdiv traffic police page"},
+  "Бургас": {"name": "ОДМВР – Бургас, сектор „Пътна полиция“", "email": "trafficpoliceburgas@mvr.bg", "confidence": "high", "source": "mvr.bg/burgas traffic police page"},
+  "Русе": {"name": "ОДМВР – Русе, сектор „Пътна полиция“", "email": "trafficpoliceruse@mvr.bg", "confidence": "high", "source": "mvr.bg/ruse traffic police page"},
+  "Силистра": {"name": "ОДМВР – Силистра", "email": "silistra@mvr.bg", "confidence": "high", "source": "mvr.bg/silistra: mailbox for traffic violation reports with photo/video"},
+  "Варна": {"name": "ОДМВР – Варна", "email": "varna@mvr.bg", "confidence": "medium", "source": "visit.varna.bg police contacts"},
+  "Благоевград": {"name": "ОДМВР – Благоевград", "email": "blagoevgrad@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Велико Търново": {"name": "ОДМВР – Велико Търново", "email": "veliko-tarnovo@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Видин": {"name": "ОДМВР – Видин", "email": "vidin@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Враца": {"name": "ОДМВР – Враца", "email": "vratza@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Габрово": {"name": "ОДМВР – Габрово", "email": "gabrovo@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Добрич": {"name": "ОДМВР – Добрич", "email": "dobrich@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Монтана": {"name": "ОДМВР – Монтана", "email": "montana@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Перник": {"name": "ОДМВР – Перник", "email": "pernik@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Разград": {"name": "ОДМВР – Разград", "email": "od_razgrad@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Смолян": {"name": "ОДМВР – Смолян", "email": "smolyan@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Ямбол": {"name": "ОДМВР – Ямбол", "email": "yambol@mvr.bg", "confidence": "medium", "source": "mvr.bg contacts (search snippet)"},
+  "Стара Загора": {"name": "ОДМВР – Стара Загора", "email": null},
+  "Плевен": {"name": "ОДМВР – Плевен", "email": null},
+  "Шумен": {"name": "ОДМВР – Шумен", "email": null},
+  "Хасково": {"name": "ОДМВР – Хасково", "email": null},
+  "Пазарджик": {"name": "ОДМВР – Пазарджик", "email": null},
+  "Сливен": {"name": "ОДМВР – Сливен", "email": null},
+  "Кюстендил": {"name": "ОДМВР – Кюстендил", "email": null},
+  "Ловеч": {"name": "ОДМВР – Ловеч", "email": null},
+  "Търговище": {"name": "ОДМВР – Търговище", "email": null},
+  "Кърджали": {"name": "ОДМВР – Кърджали", "email": null}
+ }
+}

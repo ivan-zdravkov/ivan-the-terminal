@@ -1,0 +1,50 @@
+name: "Подай глобата: имейл на институция / authority email"
+description: Грешен или липсващ имейл за сигнали за паркиране. Wrong or missing email for parking reports.
+title: "podai-globata: имейл за <град>"
+labels: ["podai-globata", "authority-email"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Благодарим! Формата е **публична**: не пишете лични данни, номера на коли или снимки.
+        Thank you! This form is **public**: no personal data, plates or photos.
+  - type: input
+    id: city
+    attributes:
+      label: Град / община · City / municipality
+      placeholder: Пловдив
+    validations:
+      required: true
+  - type: input
+    id: institution
+    attributes:
+      label: Институция · Institution
+      placeholder: ОДМВР Пловдив – сектор „Пътна полиция“ / общинска служба за контрол на паркирането
+    validations:
+      required: true
+  - type: input
+    id: wrong
+    attributes:
+      label: Грешен имейл (ако има) · Wrong address (if any)
+  - type: input
+    id: right
+    attributes:
+      label: Правилен имейл · Correct address
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Линк към официалната страница с имейла · Official page that publishes it
+      placeholder: https://...
+  - type: dropdown
+    id: evidence
+    attributes:
+      label: Откъде знаете? · How do you know?
+      options:
+        - Публикуван е на сайта на институцията · Published on the institution's site
+        - Получих отговор / входящ номер от него · I got a reply / incoming number from it
+        - Старият върна грешка (bounce) · The old one bounced
+        - Друго · Other
+    validations:
+      required: true
