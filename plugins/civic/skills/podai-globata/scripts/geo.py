@@ -95,23 +95,18 @@ def route(oblast, municipality=None, green=False, city=None):
     mvr = pick(db["mvr"], oblast)
     mun = pick(db["municipal"], municipality, city)
     grn = pick(db["green_area"], municipality, city) if green else None
-    main = grn or mun
-    to, cc, lookup = [], [], []
-    if main:
-        to.append(main)
+    to, cc, lookup = [db["national"]], [], []
+    if grn or mun:
+        cc.append(grn or mun)
     else:
         lookup.append(f"municipal parking control for {municipality or city or oblast}: search the municipality's "
-                      "site for its email for reports (сигнали); if none, the police alone is fine")
-    if mvr and mvr.get("email"):
-        (cc if to else to).append(mvr)
-    else:
-        lookup.append(f"{(mvr or {}).get('name') or 'ОДМВР for ' + str(oblast)}: search mvr.bg for its email "
-                      "(трафик полиция / контакти)")
-    for r in to + cc:
+                      "site for its email for reports (сигнали) and add it as Cc; if none, the МВР reception alone is fine")
+    for r in cc:
         if r.get("confidence") == "medium":
             lookup.append(f"verify {r['email']} ({r['name']}) if you can search the web")
+    fallback = [mvr] if mvr and mvr.get("email") else []
     slim = lambda rs: [{k: r[k] for k in ("name", "email", "confidence") if k in r} for r in rs]  # noqa: E731
-    return {"to": slim(to), "cc": slim(cc), "lookup": lookup}
+    return {"to": slim(to), "cc": slim(cc), "fallback": slim(fallback), "lookup": lookup}
 
 
 def locate(lat, lon, green):

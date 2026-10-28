@@ -2,7 +2,8 @@ name: skill-release
 
 # Keeps each skill's claude.ai upload zip current. Opt-in: a skill is published when a release tagged with its name
 # exists (e.g. `podai-globata`), so the download link never changes. The zip is deterministic: it is only re-uploaded
-# when its contents changed.
+# when its contents changed. A skill with `metadata.version` in SKILL.md also gets one fixed release per version
+# (`podai-globata-v0.2.0`, notes from its CHANGELOG.md); lint_skills.py keeps that version equal to plugin.json.
 on:
   push:
     branches: [main]
@@ -38,6 +39,17 @@ jobs:
             name=$(basename "$dir")
             gh release view "$name" >/dev/null 2>&1 || continue
             python3 -I tools/package_skill.py "$dir" dist >/dev/null
+            version=$(sed -n '/^---$/,/^---$/s/^[[:space:]]\{1,\}version:[[:space:]]*"\{0,1\}\([0-9][0-9.]*\)"\{0,1\}[[:space:]]*$/\1/p' "$dir/SKILL.md" | head -n1)
+            if [ -n "$version" ] && ! gh release view "$name-v$version" >/dev/null 2>&1; then
+              awk -v v="$version" 'index($0, "## [" v "]") == 1 {f = 1; next} /^## \[|^\[[^]]+\]: / {f = 0} f' \
+                "$dir/CHANGELOG.md" > notes.md 2>/dev/null || true
+              printf '\n---\nAlways the latest: [%s.zip](https://github.com/%s/releases/download/%s/%s.zip)\n' \
+                "$name" "$GH_REPO" "$name" "$name" >> notes.md
+              gh release create "$name-v$version" "dist/$name.zip" --target "$GITHUB_SHA" --latest=false \
+                --title "$name $version" --notes-file notes.md
+              gh release edit "$name" --title "$(gh release view "$name" --json name -q .name | sed 's/ v[0-9][0-9.]*$//') v$version"
+              echo "$name: released $version"
+            fi
             if gh release download "$name" -p "$name.zip" -D old --clobber 2>/dev/null && cmp -s "old/$name.zip" "dist/$name.zip"; then
               echo "$name: unchanged"
               continue

@@ -42,7 +42,7 @@
     {
       "name": "civic",
       "source": "./plugins/civic",
-      "description": "Подай глобата (podai-globata): 1+ photos of a wrongly parked car in Bulgaria become a formal report to the right authority (ЦГМ, СДВР, ОДМВР, municipalities) with time, GPS, address, plate and legal basis - as a Gmail draft, mailto link or copy text.",
+      "description": "Подай глобата (podai-globata): 1+ photos of a wrongly parked car in Bulgaria become a formal СВЕДЕНИЕ to the МВР reception, with the municipality in copy (time, address, plate, legal basis) - as a Gmail draft, mailto link or copy text.",
       "category": "productivity"
     }
   ]

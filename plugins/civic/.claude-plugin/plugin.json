@@ -1,6 +1,6 @@
 {
   "name": "civic",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Civic reporting for Bulgaria: Подай глобата (podai-globata) turns 1+ photos of a wrongly parked car into a formal report email to the right authority (time, GPS, address, plate, violations with legal basis), as a Gmail draft, mailto link or copy text. Works on claude.ai (phone) and in Claude Code.",
   "author": {
     "name": "Ivan Zdravkov",

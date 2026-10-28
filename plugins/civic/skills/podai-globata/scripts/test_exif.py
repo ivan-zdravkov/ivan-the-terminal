@@ -123,6 +123,12 @@ class Exif(unittest.TestCase):
         self.assertEqual(("2026-10-26 08:41:00", "+03:00"), (s["taken_local"], s["utc_offset"]))
         self.assertIn("address", exif.summarize([{"file": "c"}])["next"])
 
+    def test_summary_names_the_camera_most_photos_came_from(self):
+        s = exif.summarize([{"file": "a", "camera": "Apple iPhone 15"}, {"file": "b", "camera": "Apple iPhone 15"},
+                            {"file": "c", "camera": "samsung SM-S911B"}, {"file": "d"}])
+        self.assertEqual("Apple iPhone 15", s["camera"])
+        self.assertNotIn("camera", exif.summarize([{"file": "d"}]))
+
 
 if __name__ == "__main__":
     unittest.main()
