@@ -140,7 +140,14 @@ The МВР template asks for your full name, postal address, mobile number, emai
 
 The skill works without any of them. Anonymous reports aren't processed, though (art. 111(4) of the Administrative Procedure Code), so fill in at least your full name before sending, yourself or through Claude.
 
-**The author has no access** to your data, photos or emails. The skill has no server, database or tracking. Only the email you approve leaves, from your own mailbox, and, if you allowed maps, only coordinates go to OpenStreetMap. Photos and text pass through Claude like any conversation ([Anthropic privacy](https://www.anthropic.com/legal/privacy)).
+**The author has no access** to your data, photos or emails. The skill has no server, database or tracking of its own. This is where your data goes and who sees it:
+
+- **Claude (Anthropic):** the photos you send and everything in the chat, including the personal data you give as "remember" or "this time only". It's handled like any of your Claude conversations ([Anthropic privacy](https://www.anthropic.com/legal/privacy)). Remembered data stays in your Claude account or, in Claude Code, in a file on your computer.
+- **Your email provider (Gmail etc.):** with Gmail connected in Claude, the draft is created in your mailbox. Once you send it, your provider carries and stores it like any email you send.
+- **МВР and the municipality:** they receive the email you send with everything in it: the sender's personal data, the car, the place and time, and the photos you attach. They process it to handle the report, may forward it to the competent authority (art. 112 of the Administrative Procedure Code) or call you as a witness. Nothing reaches them until you press Send.
+- **OpenStreetMap:** only if you allowed maps (see "Other ways" above), Claude sends the GPS coordinates from the photo to OpenStreetMap to find the address. Only the coordinates go, with no photos and no personal data. Without that permission nothing goes there and Claude asks for the address. The email itself has no coordinates.
+
+Nothing goes anywhere else.
 
 To delete them, tell Claude "forget the Подай глобата details".
 
