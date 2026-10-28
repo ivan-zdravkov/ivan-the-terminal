@@ -74,4 +74,4 @@ the video separately on physical media (disc or USB stick), e.g. at the local po
 the printed СВЕДЕНИЕ, or however МВР asks. Say plainly that it is inconvenient.
 
 The СВЕДЕНИЕ structure, the МВР reception address and the video advice come from the Facebook group
-„Паркиране в София: нови идеи“, with thanks.
+[„Паркиране в София: нови идеи“](https://www.facebook.com/profile.php?id=61572325905650), with thanks.

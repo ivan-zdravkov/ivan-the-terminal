@@ -83,7 +83,7 @@ A car on the sidewalk next to an intersection. The sender gave Claude none of th
 
 </details>
 
-🙏 The „Сведение“ (statement) template, the МВР address and the video advice come from the Facebook group **„Паркиране в София: нови идеи“**. Thank you! What changed: [version history](CHANGELOG.md).
+🙏 The „Сведение“ (statement) template, the МВР address and the video advice come from the Facebook group **[„Паркиране в София: нови идеи“](https://www.facebook.com/profile.php?id=61572325905650)**. Thank you! What changed: [version history](CHANGELOG.md).
 
 ## Important before your first report
 
