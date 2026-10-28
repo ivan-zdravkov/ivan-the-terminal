@@ -17,26 +17,28 @@ def emails(rs):
 
 
 class Route(unittest.TestCase):
-    def test_sofia_goes_to_cgm_with_sdvr_in_copy(self):
+    def test_sofia_goes_to_mvr_reception_with_cgm_in_copy(self):
         for args in (("София-град", "Столична"), ("София",), ("Област София-град", "Столична община")):
             r = geo.route(*args)
-            self.assertEqual(["office@sofiatraffic.bg"], emails(r["to"]), args)
-            self.assertEqual(["trafficpolicesdvr@mvr.bg"], emails(r["cc"]), args)
+            self.assertEqual(["priemna@mvr.bg"], emails(r["to"]), args)
+            self.assertEqual(["office@sofiatraffic.bg"], emails(r["cc"]), args)
+            self.assertEqual(["trafficpolicesdvr@mvr.bg"], emails(r["fallback"]), args)
 
     def test_sofia_province_is_not_the_city(self):
         r = geo.route("София", "Самоков")
-        self.assertEqual(["odmvr-sofia@mvr.bg"], emails(r["to"]))
+        self.assertEqual((["priemna@mvr.bg"], []), (emails(r["to"]), r["cc"]))
+        self.assertEqual(["odmvr-sofia@mvr.bg"], emails(r["fallback"]))
         self.assertTrue(any("municipal" in x for x in r["lookup"]))
 
     def test_green_area_in_sofia(self):
         r = geo.route("София-град", "Столична", green=True)
-        self.assertEqual(["delovodstvo@inspectorat-so.org"], emails(r["to"]))
-        self.assertEqual(["trafficpolicesdvr@mvr.bg"], emails(r["cc"]))
+        self.assertEqual(["priemna@mvr.bg"], emails(r["to"]))
+        self.assertEqual(["delovodstvo@inspectorat-so.org"], emails(r["cc"]))
 
-    def test_unknown_police_email_asks_for_lookup(self):
+    def test_unknown_police_email_still_reaches_the_reception(self):
         r = geo.route("Плевен", "Плевен")
-        self.assertEqual(([], []), (r["to"], r["cc"]))
-        self.assertEqual(2, len(r["lookup"]))
+        self.assertEqual((["priemna@mvr.bg"], [], []), (emails(r["to"]), r["cc"], r["fallback"]))
+        self.assertEqual(1, len(r["lookup"]))
 
     def test_every_oblast_is_listed(self):
         db = json.loads(geo.DATA.read_text(encoding="utf-8"))

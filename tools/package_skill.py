@@ -3,7 +3,7 @@
 
   package_skill.py SKILL_DIR [OUT_DIR]      default OUT_DIR: dist/
 
-The zip holds one folder named like the skill, as claude.ai requires. Tests, caches and READMEs stay out.
+The zip holds one folder named like the skill, as claude.ai requires. Tests, caches, READMEs and changelogs stay out.
 Timestamps are fixed, so the same tree always gives the same zip (and the same sha256).
 """
 import hashlib
@@ -16,7 +16,7 @@ FIXED = (2026, 1, 1, 0, 0, 0)
 
 
 def wanted(p):
-    return not (SKIP_DIRS & set(p.parts) or p.name.startswith(("test_", ".", "README")) or p.suffix == ".pyc")
+    return not (SKIP_DIRS & set(p.parts) or p.name.startswith(("test_", ".", "README", "CHANGELOG")) or p.suffix == ".pyc")
 
 
 def package(skill, out):

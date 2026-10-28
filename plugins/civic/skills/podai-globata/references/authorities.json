@@ -1,6 +1,7 @@
 {
- "checked": "2026-10-26",
- "rule": "In towns the municipality's control service enforces stopping and parking (ZDvP art. 167(2)(1)): it is the main recipient, the regional police (MVR) gets a copy. Without a known municipal address the police is the main recipient. confidence: high = read on the institution's own page; medium = from a directory or search snippet, verify when you can.",
+ "checked": "2026-10-28",
+ "rule": "Every report goes to the MVR citizens' reception (national, all cities; it forwards to the regional police). In towns the municipality's control service also enforces stopping and parking (ZDvP art. 167(2)(1)): it gets a copy. The regional MVR addresses are fallbacks if the reception bounces or answers that it is not competent. confidence: high = read on the institution's own page; medium = from a directory or search snippet, verify when you can.",
+ "national": {"name": "МВР – Приемна, на вниманието на служба КАТ", "email": "priemna@mvr.bg", "confidence": "high", "source": "mvr.bg/en/contacts: e-mail for complaints, signals and proposals; the address the Facebook group „Паркиране в София: нови идеи“ uses for its СВЕДЕНИЕ template"},
  "municipal": {
   "Столична": {"name": "Център за градска мобилност ЕАД (ЦГМ)", "email": "office@sofiatraffic.bg", "confidence": "high", "source": "inspectorat-so.org/сигнали: parking on sidewalks and roadways goes to ЦГМ; spasisofia.org"},
   "Пловдив": {"name": "Общински инспекторат – Пловдив", "email": "inspektorat@plovdiv.bg", "confidence": "medium", "source": "inspektoratplovdiv.bg (controls parking); plovdivzahorata.org"},

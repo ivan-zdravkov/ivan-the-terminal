@@ -179,6 +179,9 @@ def summarize(photos):
     if times:
         s["taken_local"] = times[0]
         s["utc_offset"] = next((p["utc_offset"] for p in photos if p.get("utc_offset")), None)
+    cameras = [p["camera"] for p in photos if p.get("camera")]
+    if cameras:
+        s["camera"] = max(set(cameras), key=cameras.count)
     if not fixes:
         s["next"] = "ask for the address or a map pin; read street signs and house numbers in the photos"
     return s

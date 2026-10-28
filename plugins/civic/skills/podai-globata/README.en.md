@@ -4,7 +4,7 @@
 
 Free · Android, iPhone and desktop · all you need is a [Claude](https://claude.ai) account (the free plan works)
 
-[How it works](#how-it-works) · [Install](#install-3-minutes-once) · [Example email](#example-email) · [Important](#important-before-your-first-report) · [Questions](#questions) · [Български](README.md)
+[How it works](#how-it-works) · [Install](#install-3-minutes-once) · [Example email](#example-email) · [Important](#important-before-your-first-report) · [Questions](#questions) · [Versions](CHANGELOG.md) · [Български](README.md)
 
 Useful? **[⭐ Star it on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal)** (the **Star** button, top right) so more people find it.
 
@@ -14,7 +14,7 @@ Useful? **[⭐ Star it on GitHub](https://github.com/ivan-zdravkov/ivan-the-term
 2. **Send the photos to Claude** in a new chat. No need to type anything.
 3. **Check the finished email**, attach the photos and send.
 
-Claude finds the date, time and place, the plate and make, the violations with the article of the law, and the right authority (Sofia: the Urban Mobility Centre, with the city police in copy). If anything is missing, it asks.
+Claude finds the date, time and place, the plate and make, the violations with the article of the law, and the right authority (the police, with the municipality in copy). If anything is missing, it asks.
 
 ## Install (3 minutes, once)
 
@@ -38,53 +38,59 @@ Done. On a phone, close and reopen the Claude app. Plugins need a paid plan (Pro
 
 ## Example email
 
-A car on the sidewalk next to an intersection, with a fictional sender. The email is always in Bulgarian, and Claude shows it to you before anything is sent.
+A car on the sidewalk next to an intersection, with a fictional sender who kept their address, ID card and personal number (ЕГН) from Claude: they stay as [blank fields] to fill in before sending. The email is always in Bulgarian, and Claude shows it to you before anything is sent.
 
 <details>
-<summary><b>To:</b> Urban Mobility Centre · <b>Cc:</b> Sofia traffic police · <b>Subject:</b> report of a wrongly parked car, CA1234AB, Граф Игнатиев / Солунска (tap to see the whole email)</summary>
+<summary><b>To:</b> МВР (traffic police service) · <b>Cc:</b> Urban Mobility Centre · <b>Subject:</b> statement on a wrongly parked car, CA1234AB, Граф Игнатиев / Солунска (tap to see the whole email)</summary>
 
-> **До:** office@sofiatraffic.bg (ЦГМ)<br>
-> **Копие:** trafficpolicesdvr@mvr.bg (СДВР – „Пътна полиция“)<br>
-> **Тема:** Сигнал за неправилно паркиране – CA1234AB, ул. „Граф Игнатиев“ / ул. „Солунска“, 25.10.2026 18:42
+> **До:** priemna@mvr.bg (МВР – Приемна, на вниманието на служба КАТ)<br>
+> **Копие:** office@sofiatraffic.bg (ЦГМ)<br>
+> **Тема:** Сведение за неправилно паркиран автомобил – CA1234AB, ул. „Граф Игнатиев“ / ул. „Солунска“, София, 25.10.2026 18:42
 >
-> Уважаеми госпожи и господа,
+> На вниманието на служба КАТ
 >
-> Подавам сигнал за неправилно паркиран автомобил, на който съм очевидец:
+> **СВЕДЕНИЕ**
 >
-> Дата и час: 25.10.2026 г., 18:42 ч. (по данни от снимките)<br>
-> Място: кръстовището на ул. „Граф Игнатиев“ и ул. „Солунска“, гр. София<br>
-> GPS координати: 42.692545, 23.323929 (точност около 5 м)<br> <!-- leakguard:allow (example: public intersection) -->
-> Карта: https://maps.google.com/?q=42.692545,23.323929<br> <!-- leakguard:allow (example: public intersection) -->
-> Превозно средство: Volkswagen Golf, сив, рег. № CA1234AB
+> Име, презиме, фамилия: Мария Петрова Иванова<br>
+> Адрес за кореспонденция: [адрес за кореспонденция]<br>
+> Мобилен номер: 08XX XXX XXX<br>
+> Имейл: maria@example.com<br>
+> Номер на ЛК/ЛНЧ: [№ на ЛК/ЛНЧ], ЕГН: [ЕГН]
 >
-> Нарушения:
-> 1. Паркиране върху тротоар извън обозначените места, без да остават 2 м за пешеходците – чл. 94, ал. 3; чл. 183, ал. 2, т. 1 ЗДвП;
-> 2. Паркиране на по-малко от 5 м от кръстовище – чл. 98, ал. 1, т. 6; чл. 183, ал. 4, т. 8 ЗДвП.
+> На 25.10.2026 г. около 18:42 ч., минавайки по кръстовището на ул. „Граф Игнатиев“ и ул. „Солунска“, гр. София, установих 1 брой лек автомобил Volkswagen Golf, сив, рег. № CA1234AB, спрял в нарушение:
+> 1. паркиране върху тротоар извън обозначените места, без да остават 2 м за пешеходците – чл. 94, ал. 3; чл. 183, ал. 2, т. 1 ЗДвП;
+> 2. паркиране на по-малко от 5 м от кръстовище – чл. 98, ал. 1, т. 6; чл. 183, ал. 4, т. 8 ЗДвП.
 >
-> Прилагам 2 бр. снимки (оригинални файлове с дата, час и местоположение).
+> Прилагам 2 бр. снимков материал и 0 бр. видео материал, направени с мобилен телефон марка Apple, модел iPhone 15, с информация за нарушението (оригинални файлове с дата, час и местоположение) към сведението за потвърждаване на гореспоменатото.
+>
+> Запознат съм с наказателната отговорност, която се носи по чл. 313, ал. 1 от НК при потвърждаване на неистина или затаяване на истина.
 >
 > Моля:
-> 1. Въз основа на приложените снимки и моите показания като очевидец да съставите акт за установяване на административно нарушение и да наложите предвидената в ЗДвП санкция на собственика или ползвателя на автомобила (чл. 188 ЗДвП).
+> 1. Въз основа на приложените снимки и сведението ми да съставите акт за установяване на административно нарушение и да наложите предвидената санкция на собственика или ползвателя на автомобила (чл. 188 от ЗДвП).
 > 2. Да ми съобщите входящия номер на сигнала.
 > 3. Да ме уведомите писмено за предприетите действия в законоустановения срок (чл. 121 и чл. 123 от АПК).
 >
-> Заявявам готовност да бъда свидетел при съставянето на акта (чл. 40, ал. 1 от ЗАНН) и да предоставя снимките в оригинал.
-> Ако сигналът не е от Вашата компетентност, моля да го препратите на компетентния орган съгласно чл. 112 от АПК.
+> Ако сигналът не е от Вашата компетентност, моля да го препратите на компетентния орган (чл. 112 от АПК).
 >
-> С уважение,<br>
-> Мария Петрова Иванова<br>
-> Тел.: 08XX XXX XXX<br>
-> Имейл: maria@example.com
+> При необходимост заявявам, че ще се явя като свидетел-очевидец при съответните институции (чл. 40, ал. 1 от ЗАНН), стига това време да не е в неразрешим конфликт със служебните ми задължения.
+>
+> Дата: 25.10.2026 г.
+>
+> Дал сведения: Мария Петрова Иванова<br>
+> Приел сведения: ______________________
 >
 > 📎 *2 прикачени снимки*
 
 </details>
+
+🙏 The „Сведение“ (statement) template, the МВР address and the video advice come from the Facebook group **„Паркиране в София: нови идеи“**. Thank you! What changed: [version history](CHANGELOG.md).
 
 ## Important before your first report
 
 - **📎 Attach the original photos yourself before sending.** Claude can't attach them to the email, and without them the report is weak.
 - **👮 You may be asked to act as a witness.** That's what lets the authority fine from the photos, without an on-site check days later.
 - **Check the plate and violations** in the preview: Claude reads them from the photo.
+- **✍️ Fill in the blank fields** such as `[ЕГН]` if you chose not to give them to Claude.
 - **Bulgaria only.** This isn't legal advice.
 
 ## Questions
@@ -101,14 +107,16 @@ To make the camera save the location: iPhone → Settings → Privacy & Security
 <details>
 <summary><b>Who receives the report?</b></summary>
 
-Parking in towns is enforced by the municipality (art. 167(2) of the Road Traffic Act), so the report goes to the municipal service, with the police in copy:
+Everywhere to the **Ministry of Interior's reception** (priemna@mvr.bg, for the traffic police service). It takes reports from the whole country and forwards them to the city or regional police. Municipalities also enforce parking in towns (art. 167(2) of the Road Traffic Act), so they get a copy:
 
 | City | To | Cc |
 |---|---|---|
-| Sofia | Urban Mobility Centre (ЦГМ) | Sofia traffic police (СДВР) |
-| Sofia, car on a green area | Sofia Inspectorate | СДВР |
-| Plovdiv, Varna, Burgas | the municipal service | the regional police (ОДМВР) |
-| Other towns | the regional police (+ the municipality, if Claude finds its address) | |
+| Sofia | МВР reception (traffic police) | Urban Mobility Centre (ЦГМ) |
+| Sofia, car on a green area | МВР reception | Sofia Inspectorate |
+| Plovdiv, Varna, Burgas | МВР reception | the municipal service |
+| Other towns | МВР reception | the municipality, if Claude finds its address |
+
+If the reception bounces the email, Claude offers the city or regional police instead.
 
 Violations follow the Road Traffic Act as amended in September 2025: sidewalks, crossings, intersections, tactile paving, ramps, disabled bays, bike lanes, stops, double parking, in front of garages or schools and more ([violations.md](references/violations.md)).
 
@@ -124,7 +132,13 @@ A fine needs an official act drawn up in the presence of witnesses to the violat
 <details>
 <summary><b>Where is my personal data kept?</b></summary>
 
-Your full name, email and phone, because anonymous reports aren't processed. Claude asks once and keeps them where you choose: Claude memory or your profile preferences (Settings → Profile), i.e. your own account. In Claude Code, a file on your computer.
+The МВР template asks for your full name, postal address, mobile number, email, ID card number and personal number (ЕГН). **You decide which to give.** The first time, Claude asks about each field:
+
+- **remember:** kept in Claude memory or your profile preferences (Settings → Profile), i.e. your own account. In Claude Code: a file on your computer;
+- **this time only:** used in this email only;
+- **don't give:** the email keeps a blank field such as `[ЕГН]`, and you fill it in the draft before sending. That way your ЕГН and ID card never pass through Claude.
+
+The skill works without any of them, but anonymous reports aren't processed (art. 111(4) of the Administrative Procedure Code), so at least your full name must be in the email when you send it.
 
 **The author has no access** to your data, photos or emails. The skill has no server, database or tracking. Only the email you approve leaves, from your own mailbox, and, if you allowed maps, only coordinates go to OpenStreetMap. Photos and text pass through Claude like any conversation ([Anthropic privacy](https://www.anthropic.com/legal/privacy)).
 
@@ -143,6 +157,13 @@ Yes. It's plain text: instructions and three short Python scripts, exactly [thes
 <summary><b>How do I update?</b></summary>
 
 The **Plugins** (GitHub) install and Claude Code update themselves; if you don't see a change, remove and re-add the plugin. An uploaded .zip doesn't: delete the skill in **Customize → Skills** and upload the file again from the same link. To hear about new versions: on GitHub, **Watch → Custom → Releases**.
+
+</details>
+
+<details>
+<summary><b>I have a video?</b></summary>
+
+Attach a short clip (up to ~20 MB) like the photos. Bigger files don't fit in an email, and МВР has no upload portal. Do what the template's author does: print the statement, put the video on a disc or USB stick and hand both in at the local police station. Send the email with the photos anyway.
 
 </details>
 
