@@ -67,10 +67,11 @@ Rules:
 
 ## Video
 
-Email limits (about 25 MB) stop most videos, and МВР has no upload portal for them. A short clip under ~20 MB can be
-attached and counted in `<M>`. Otherwise tell the user what the template's author does: print this СВЕДЕНИЕ, put the
-video on a disc or USB stick, and hand both in at the local police station (районно управление). Send the email with
-the photos anyway.
+Photos are usually enough: don't ask for video. If the user has one, a short clip under ~20 MB can be attached and
+counted in `<M>`. Bigger files don't pass email limits, and МВР has no upload portal. Don't suggest a cloud link:
+МВР most likely won't open it and needs the original files. Tell the user to send the email with the photos and provide
+the video separately on physical media (disc or USB stick), e.g. at the local police station (районно управление) with
+the printed СВЕДЕНИЕ, or however МВР asks. Say plainly that it is inconvenient.
 
 The СВЕДЕНИЕ structure, the МВР reception address and the video advice come from the Facebook group
 „Паркиране в София: нови идеи“, with thanks.
