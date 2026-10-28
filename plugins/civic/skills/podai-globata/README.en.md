@@ -38,7 +38,7 @@ Done. On a phone, close and reopen the Claude app. Plugins need a paid plan (Pro
 
 ## Example email
 
-A car on the sidewalk next to an intersection, with a fictional sender who kept their address, ID card and personal number (ЕГН) from Claude: they stay as [blank fields] to fill in before sending. The email is always in Bulgarian, and Claude shows it to you before anything is sent.
+A car on the sidewalk next to an intersection. The sender gave Claude none of their personal data, so every field stays as a [blank field] they fill in before sending. The email is always in Bulgarian, and Claude shows it to you before anything is sent.
 
 <details>
 <summary><b>To:</b> МВР (traffic police service) · <b>Cc:</b> Urban Mobility Centre · <b>Subject:</b> statement on a wrongly parked car, CA1234AB, Граф Игнатиев / Солунска (tap to see the whole email)</summary>
@@ -51,10 +51,10 @@ A car on the sidewalk next to an intersection, with a fictional sender who kept 
 >
 > **СВЕДЕНИЕ**
 >
-> Име, презиме, фамилия: Мария Петрова Иванова<br>
+> Име, презиме, фамилия: [три имена]<br>
 > Адрес за кореспонденция: [адрес за кореспонденция]<br>
-> Мобилен номер: 08XX XXX XXX<br>
-> Имейл: maria@example.com<br>
+> Мобилен номер: [мобилен номер]<br>
+> Имейл: [имейл]<br>
 > Номер на ЛК/ЛНЧ: [№ на ЛК/ЛНЧ], ЕГН: [ЕГН]
 >
 > На 25.10.2026 г. около 18:42 ч., минавайки по кръстовището на ул. „Граф Игнатиев“ и ул. „Солунска“, гр. София, установих 1 брой лек автомобил Volkswagen Golf, сив, рег. № CA1234AB, спрял в нарушение:
@@ -76,7 +76,7 @@ A car on the sidewalk next to an intersection, with a fictional sender who kept 
 >
 > Дата: 25.10.2026 г.
 >
-> Дал сведения: Мария Петрова Иванова<br>
+> Дал сведения: [три имена]<br>
 > Приел сведения: ______________________
 >
 > 📎 *2 прикачени снимки*
@@ -90,7 +90,7 @@ A car on the sidewalk next to an intersection, with a fictional sender who kept 
 - **📎 Attach the original photos yourself before sending.** Claude can't attach them to the email, and without them the report is weak.
 - **👮 You may be asked to act as a witness.** That's what lets the authority fine from the photos, without an on-site check days later.
 - **Check the plate and violations** in the preview: Claude reads them from the photo.
-- **✍️ Fill in the blank fields** such as `[ЕГН]` if you chose not to give them to Claude.
+- **✍️ Fill in the blank fields** such as `[три имена]` or `[имейл]` if you chose not to give them to Claude.
 - **Bulgaria only.** This isn't legal advice.
 
 ## Questions
@@ -132,13 +132,13 @@ A fine needs an official act drawn up in the presence of witnesses to the violat
 <details>
 <summary><b>Where is my personal data kept?</b></summary>
 
-The МВР template asks for your full name, postal address, mobile number, email, ID card number and personal number (ЕГН). **You decide which to give.** The first time, Claude asks about each field:
+The МВР template asks for your full name, postal address, mobile number, email, ID card number and personal number (ЕГН). All of it is personal data, and **you decide about every field**, your name, email and phone included. The first time, Claude asks about each field:
 
 - **remember:** kept in Claude memory or your profile preferences (Settings → Profile), i.e. your own account. In Claude Code: a file on your computer;
 - **this time only:** used in this email only;
-- **don't give:** the email keeps a blank field such as `[ЕГН]`, and you fill it in the draft before sending. That way your ЕГН and ID card never pass through Claude.
+- **don't give:** the email keeps a blank field such as `[ЕГН]`, and you fill it in the draft before sending. That way that data never passes through Claude. Claude doesn't take it from elsewhere either, such as your Gmail account.
 
-The skill works without any of them, but anonymous reports aren't processed (art. 111(4) of the Administrative Procedure Code), so at least your full name must be in the email when you send it.
+The skill works without any of them. Anonymous reports aren't processed, though (art. 111(4) of the Administrative Procedure Code), so fill in at least your full name before sending, yourself or through Claude.
 
 **The author has no access** to your data, photos or emails. The skill has no server, database or tracking. Only the email you approve leaves, from your own mailbox, and, if you allowed maps, only coordinates go to OpenStreetMap. Photos and text pass through Claude like any conversation ([Anthropic privacy](https://www.anthropic.com/legal/privacy)).
 

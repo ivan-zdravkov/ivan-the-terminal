@@ -35,7 +35,8 @@ reception (priemna@mvr.bg, national), Cc the municipal service when known; `fall
 ## 3. Sender
 Look for a `Подай глобата подател:` line in memory, profile preferences or project instructions, or for
 `~/.config/podai-globata/sender.json`. Missing (or a 0.1.0 line without the new fields): follow `references/setup.md`:
-the user decides field by field what to give; withheld fields stay as `[…]` placeholders. Never insist.
+the user decides field by field what to give, name, email and phone included; withheld fields stay as `[…]`
+placeholders. Never fill one from elsewhere (Gmail account, profile name) and never insist.
 
 ## 4. Preview → confirm
 Write the email from `references/email-template.md`. Show To/Cc (names + emails), subject and body, then a short list of
