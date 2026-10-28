@@ -156,7 +156,9 @@ To delete them, tell Claude "forget the Подай глобата details".
 <details>
 <summary><b>Is the .zip file safe?</b></summary>
 
-Yes. It's plain text: instructions and three short Python scripts, exactly [these on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal/tree/main/plugins/civic/skills/podai-globata). It never installs or runs on your phone: Claude uses it in its own sandbox. The skill does nothing outbound without your explicit yes.
+Yes. It's plain text: instructions (`SKILL.md` and a `references` folder) and three short Python scripts. `exif.py` reads the date, time and place from the photos, `geo.py` finds the address and the recipients, and `mailto.py` builds the mail link. It's all [on GitHub](https://github.com/ivan-zdravkov/ivan-the-terminal/tree/main/plugins/civic/skills/podai-globata), which also has tests, READMEs and a version history that the zip leaves out.
+
+It never installs or runs on your phone: Claude uses it in its own sandbox. No email is sent without your explicit yes. The only thing the skill does on its own is look up the address on OpenStreetMap, and only if you allowed maps. Only the GPS coordinates go there.
 
 </details>
 
