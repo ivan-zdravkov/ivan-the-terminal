@@ -111,7 +111,7 @@ Everywhere to the **Ministry of Interior's reception** (priemna@mvr.bg, for the 
 
 | City | To | Cc |
 |---|---|---|
-| Sofia | МВР reception (traffic police) | Urban Mobility Centre (ЦГМ) |
+| Sofia | МВР reception | Urban Mobility Centre (ЦГМ) |
 | Sofia, car on a green area | МВР reception | Sofia Inspectorate |
 | Plovdiv, Varna, Burgas | МВР reception | the municipal service |
 | Other towns | МВР reception | the municipality, if Claude finds its address |
