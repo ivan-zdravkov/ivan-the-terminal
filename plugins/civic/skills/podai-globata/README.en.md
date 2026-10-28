@@ -90,7 +90,7 @@ A car on the sidewalk next to an intersection. The sender gave Claude none of th
 - **📎 Attach the original photos yourself before sending.** Claude can't attach them to the email, and without them the report is weak.
 - **👮 You may be asked to act as a witness.** That's what lets the authority fine from the photos, without an on-site check days later.
 - **Check the plate and violations** in the preview: Claude reads them from the photo.
-- **✍️ Fill in the blank fields** such as `[три имена]` or `[ЕГН]` if you chose not to give them to Claude.
+- **✍️ Fill in the blank fields** such as `[три имена]` or `[имейл]` if you chose not to give them to Claude.
 - **Bulgaria only.** This isn't legal advice.
 
 ## Questions
