@@ -161,9 +161,11 @@ The **Plugins** (GitHub) install and Claude Code update themselves; if you don't
 </details>
 
 <details>
-<summary><b>I have a video?</b></summary>
+<summary><b>Can I send a video too?</b></summary>
 
-Attach a short clip (up to ~20 MB) like the photos. Bigger files don't fit in an email, and МВР has no upload portal. Do what the template's author does: print the statement, put the video on a disc or USB stick and hand both in at the local police station. Send the email with the photos anyway.
+Photos are usually enough. If you do need to provide a video, email rarely works: a file of 20 MB or more won't go through because of email limits. A cloud link (Google Drive and the like) МВР will most likely not open, and they need the original files anyway.
+
+So send the report by email with the photos, and provide the video separately on physical media, a disc or USB stick, for example at the local police station together with the printed statement, or however МВР asks you to. It's inconvenient, but for now there's no other way.
 
 </details>
 
@@ -177,7 +179,7 @@ The authority must answer in writing within **2 months** (art. 121 of the Admini
 <details>
 <summary><b>The authority's email is wrong?</b></summary>
 
-We can't know the right address for every town in advance ([the list with sources](references/authorities.json)). If the email bounced or the authority replied that it isn't competent, [fill in the short form](https://github.com/ivan-zdravkov/ivan-the-terminal/issues/new?template=authority-email.yml) with the town, the authority and the right email, or send a PR editing `authorities.json`. The form is public: no personal data, plates or photos. The fix ships to everyone in the next version.
+The main recipient, the МВР reception (priemna@mvr.bg), is the same for the whole country. The municipal addresses in copy may not be up to date for every municipality, though ([the list with sources](references/authorities.json)). If a municipal email bounced, the authority replied that it isn't competent, or you know a better address for your municipality, [fill in the short form](https://github.com/ivan-zdravkov/ivan-the-terminal/issues/new?template=authority-email.yml) with the town, the authority and the right email, or send a PR editing `authorities.json`. The form is public: no personal data, plates or photos. The fix ships to everyone in the next version.
 
 </details>
 
