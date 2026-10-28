@@ -1,7 +1,11 @@
 # First run: sender details
 
-The СВЕДЕНИЕ asks for six sender fields. Each one is the user's choice: the skill works without any of them, and a
-field the user keeps to themselves becomes a `[…]` placeholder in the email that they fill in before sending.
+The СВЕДЕНИЕ asks for six sender fields. All six are personal data and all six are equal: the name, email and phone
+are as optional as the ЕГН. Each one is the user's choice, the skill works without any of them, and a field the user
+keeps to themselves becomes a `[…]` placeholder in the email that they fill in before sending.
+
+Never fill a field from anywhere else: not from the Gmail account, the Claude profile name, earlier chats or other
+memories. Only what the user gave for this skill.
 
 | Field | Placeholder | Why МВР asks for it |
 |---|---|---|
@@ -20,7 +24,7 @@ Ask once, in one message, in Bulgarian, before the first email:
 > **само сега** (ползвам го само в този имейл) или
 > **не давам** (оставям празно поле, например [ЕГН], и го попълвате сами преди изпращане).
 > Умението работи и без тях. Данните отиват само в имейла, който Вие одобрите. Авторът му не ги вижда.
-> Пример: „имена, телефон, имейл: запомни; адрес: само сега; ЛК и ЕГН: не давам“.
+> Пример: „всичко: не давам“, „всичко: само сега“ или „имена и имейл: запомни; останалото: не давам“.
 
 If the user just pastes some details without choosing, use them for this email only and ask once whether to remember them.
 
@@ -30,8 +34,8 @@ Remember only the fields marked "запомни", in this order of preference:
    `Подай глобата подател: име=<…>; имейл=<…>; телефон=<…>; адрес=<…>; лк=<…>; егн=<…>`, leaving out what was not
    given. Also remember `не давам: <fields>` so you don't ask again, e.g.
    `Подай глобата подател: име=…; телефон=…; не давам: лк, егн`.
-   Version 0.1.0 wrote `Подай глобата подател: <имена> | <имейл> | <телефон>`: read it as name, email, phone, and
-   ask once about the three new fields.
+   Version 0.1.0 wrote `Подай глобата подател: <имена> | <имейл> | <телефон>` without asking field by field: ask
+   once about all six, offering to keep those three, and rewrite the line in the new form (or remove it).
 2. **Profile preferences** (always works, any plan): tell the user to paste the same line into
    Settings → Profile → "What personal preferences should Claude consider in responses?" (Настройки → Профил →
    лични предпочитания). Claude then sees it in every new chat.
