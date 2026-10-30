@@ -23,7 +23,7 @@ Never push to main, never `--no-verify`, never weaken leakguard to get past a fi
 
 ## Layout
 - `plugins/<plugin>/skills/<skill>/` — skills (marketplace: `.claude-plugin/marketplace.json`)
-- `bin/itt` — CLI: `doctor`, `bootstrap`, `ship-check`, `guard`
+- `bin/itt` — CLI (Python, Linux + Windows): `doctor`, `bootstrap` (Linux-only `bootstrap.sh` for now), `ship-check`, `guard`, `run`
 - `tools/leakguard/` — personal-data scanner behind the git hooks, CI and the Claude PreToolUse hook
 - `docs/` — architecture, skill-authoring conventions (follow them), roadmap
 

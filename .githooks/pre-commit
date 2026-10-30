@@ -1,8 +1,21 @@
-#!/usr/bin/env bash
-# Block personal data and credentials before they enter a commit.
-set -euo pipefail
-ROOT=$(git rev-parse --show-toplevel)
-lg=(python3 -I "$ROOT/tools/leakguard/leakguard.py")
-[ "$(git config --bool leakguard.requireDenylist || true)" = true ] && lg+=(--require-denylist)
-"${lg[@]}" staged
-gitleaks git --pre-commit --staged --redact --no-banner --log-level warn "$ROOT"
+#!/usr/bin/env python3
+"""Block personal data and credentials before they enter a commit."""
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def leakguard(*args):
+    cmd = [sys.executable, "-I", str(ROOT / "tools/leakguard/leakguard.py")]
+    if subprocess.run(["git", "config", "--bool", "leakguard.requireDenylist"], capture_output=True,
+                      text=True).stdout.strip() == "true":
+        cmd.append("--require-denylist")
+    return cmd + list(args)
+
+
+for step in (leakguard("staged"),
+             ["gitleaks", "git", "--pre-commit", "--staged", "--redact", "--no-banner", "--log-level", "warn", str(ROOT)]):
+    if subprocess.run(step).returncode:
+        sys.exit(1)

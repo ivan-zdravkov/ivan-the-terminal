@@ -101,7 +101,7 @@ def token(configured, data_dir):
         f.parent.mkdir(parents=True, exist_ok=True)
         f.touch(mode=0o600)
         f.write_text(secrets.token_urlsafe(24))
-    return f.read_text().strip()
+    return f.read_text(encoding="utf-8").strip()
 
 
 class AppHandler(BaseHTTPRequestHandler):
@@ -290,7 +290,7 @@ class Push:
 
     def subs(self):
         try:
-            return json.loads(self.file.read_text())
+            return json.loads(self.file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return []
 

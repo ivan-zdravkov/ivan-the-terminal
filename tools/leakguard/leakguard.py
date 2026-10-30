@@ -340,7 +340,7 @@ def cmd_candidates(g, base, head):
                 corpus.update(re.findall(r"\b[^\W\d_]+\b", git("show", f"{base}:{path}").lower()))
     reviewed = set()
     if REVIEWED_FILE.is_file():
-        reviewed = {l.strip().casefold() for l in REVIEWED_FILE.read_text().splitlines() if l.strip() and l[0] != "#"}
+        reviewed = {l.strip().casefold() for l in REVIEWED_FILE.read_text(encoding="utf-8").splitlines() if l.strip() and l[0] != "#"}
     counts = {}
     for line in texts:
         terms = [w for w in WORD.findall(line) if w[0].isupper() and len(w) > 2] + NUMBERISH.findall(line)

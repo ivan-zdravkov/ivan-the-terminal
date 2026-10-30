@@ -79,16 +79,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: leakguard unit tests
-        run: python3 -I -m unittest discover -v -s tools/leakguard
-      - name: webapp unit tests
-        run: python3 -I -m unittest discover -v -s tools/webapp
-      - name: Skill script tests
-        run: |
-          for d in plugins/*/skills/*/scripts; do
-            if compgen -G "$d/test_*.py" >/dev/null; then python3 -I -m unittest discover -v -s "$d"; fi
-          done
+      - name: Unit tests, Python syntax, shellcheck
+        run: python3 -I tools/run_tests.py -v --shellcheck
       - name: Skill and manifest lint
         run: python3 -I tools/lint_skills.py
-      - name: Shell lint
-        run: shellcheck -x bin/* .githooks/* shell/* plugins/*/skills/*/scripts/run
+
+  # Skills are portable by default (docs/skill-authoring.md): the Python side must also pass on Windows.
+  tests-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Unit tests and Python syntax
+        run: python -I tools/run_tests.py -v
+      - name: Skill and manifest lint
+        run: python -I tools/lint_skills.py
+      - name: itt runs natively
+        run: python -I bin/itt help

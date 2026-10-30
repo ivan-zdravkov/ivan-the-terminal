@@ -1,28 +1,79 @@
-#!/usr/bin/env bash
-# itt: entry point for ivan-the-terminal tooling.
-set -euo pipefail
-ITT_HOME="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
-export ITT_HOME
+#!/usr/bin/env python3
+"""itt: entry point for ivan-the-terminal tooling. Stdlib only; runs on Linux and Windows."""
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
 
-usage() {
-  cat <<'USAGE'
-usage: itt <command> [args]
+ITT_HOME = Path(__file__).resolve().parents[1]
+WINDOWS = sys.platform == "win32"
+USAGE = """usage: itt <command> [args]
   doctor [-v] [--update]   health check: toolchain, auth, guards, overlay, links
-  bootstrap                set up / repair this machine (idempotent)
+  bootstrap                set up / repair this machine (idempotent; Linux only for now)
   ship-check               every local gate a branch must pass before it is pushed
   guard <mode> [...]       run leakguard directly (staged | range B H | tree | text F | candidates B H)
-  run <skill> [args]       run a skill's script (plugins/*/skills/<skill>/scripts/run)
-USAGE
-}
+  run <skill> [args]       run a skill's entry point: scripts/run.py, else run.sh (Linux) or run.ps1 (Windows)
+"""
 
-cmd="${1:-help}"; [ $# -gt 0 ] && shift
-case "$cmd" in
-  doctor|bootstrap|ship-check) exec "$ITT_HOME/bin/$cmd" "$@" ;;
-  guard) exec python3 -I "$ITT_HOME/tools/leakguard/leakguard.py" "$@" ;;
-  run)
-    skill="${1:?usage: itt run <skill> [args]}"; shift
-    for s in "$ITT_HOME"/plugins/*/skills/"$skill"/scripts/run; do [ -x "$s" ] && exec "$s" "$@"; done
-    echo "itt: no runnable skill '$skill'" >&2; exit 2 ;;
-  help|-h|--help) usage ;;
-  *) usage >&2; exit 2 ;;
-esac
+
+def entry_point(skill):
+    """The script `itt run SKILL` executes. run.py is portable; run.sh and run.ps1 are per-OS."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", skill):
+        return None
+    native = ("run.ps1",) if WINDOWS else ("run.sh", "run")
+    for d in sorted(ITT_HOME.glob(f"plugins/*/skills/{skill}/scripts")):
+        for name in ("run.py", *native):
+            if (d / name).is_file():
+                return d / name
+    return None
+
+
+def command(script, args):
+    """argv that runs SCRIPT: Python isolated (-I) with this interpreter, shell scripts by their own shell."""
+    script = Path(script)
+    if script.suffix == ".ps1":
+        return ["pwsh", "-NoProfile", "-File", str(script), *args]
+    if script.suffix == ".sh" or (script.suffix == "" and not _is_python(script)):
+        return [str(script), *args]
+    return [sys.executable, "-I", str(script), *args]
+
+
+def _is_python(script):
+    with open(script, "rb") as f:
+        return b"python" in f.readline()
+
+
+def run(argv):
+    os.environ["ITT_HOME"] = str(ITT_HOME)
+    if WINDOWS:  # no exec on Windows: wait and pass the exit code through
+        sys.exit(subprocess.run(argv).returncode)
+    os.execv(argv[0], argv)  # same PID: systemd and signals see the real script
+
+
+def main(args):
+    cmd, rest = (args[0], args[1:]) if args else ("help", [])
+    if cmd in ("doctor", "ship-check"):
+        run(command(ITT_HOME / "bin" / cmd, rest))
+    elif cmd == "bootstrap":
+        if WINDOWS:
+            sys.exit("itt: bootstrap is Linux-only for now (a PowerShell port is planned); see docs/roadmap.md")
+        run(command(ITT_HOME / "bin/bootstrap.sh", rest))
+    elif cmd == "guard":
+        run(command(ITT_HOME / "tools/leakguard/leakguard.py", rest))
+    elif cmd == "run":
+        if not rest:
+            sys.exit("usage: itt run <skill> [args]")
+        script = entry_point(rest[0])
+        if not script:
+            sys.exit(f"itt: no runnable skill '{rest[0]}' on this OS")
+        run(command(script, rest[1:]))
+    elif cmd in ("help", "-h", "--help"):
+        print(USAGE, end="")
+    else:
+        print(USAGE, end="", file=sys.stderr)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -44,7 +44,7 @@ SWITCH_VER = re.compile(r"\[v(\d+)\]")
 def load_conf():
     conf = {"ROMS": "", "PREFERRED_REGIONS": "USA,World,Europe"}
     if CONF.is_file():
-        for line in CONF.read_text().splitlines():
+        for line in CONF.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 key, value = line.split("=", 1)
@@ -287,7 +287,7 @@ def cmd_m3u(conf, system, apply):
         for old, new in moves:
             old.rename(new)
         (folder / "noload.txt").touch()
-        playlist.write_text("".join(f"{title}/{d.name}\n" for d in discs))
+        playlist.write_text("".join(f"{title}/{d.name}\n" for d in discs), encoding="utf-8", newline="\n")
         print(f"created {playlist.name}")
         made += 1
     print(f"romlib: {made} playlist(s) created" if apply else "romlib: dry run, add --apply")

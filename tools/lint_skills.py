@@ -11,14 +11,14 @@ MAX_BODY_LINES = 80    # details belong in references/ or scripts/
 SEMVER = re.compile(r"\d+\.\d+\.\d+")
 errors = []
 
-market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text())
+market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
 listed = {p["name"]: p["source"] for p in market["plugins"]}
 for plugin_dir in sorted((ROOT / "plugins").iterdir()):
     manifest = plugin_dir / ".claude-plugin/plugin.json"
     if not manifest.is_file():
         errors.append(f"{plugin_dir.name}: missing .claude-plugin/plugin.json")
         continue
-    plugin = json.loads(manifest.read_text())
+    plugin = json.loads(manifest.read_text(encoding="utf-8"))
     name = plugin["name"]
     if not SEMVER.fullmatch(plugin.get("version", "")):
         errors.append(f"{name}: plugin.json version must be MAJOR.MINOR.PATCH")
@@ -26,7 +26,7 @@ for plugin_dir in sorted((ROOT / "plugins").iterdir()):
     if listed.get(name) != f"./plugins/{plugin_dir.name}":
         errors.append(f"{name}: not listed in marketplace.json with source ./plugins/{plugin_dir.name}")
     for skill in skills:
-        text = skill.read_text()
+        text = skill.read_text(encoding="utf-8")
         m = re.match(r"---\n(.*?)\n---\n(.*)", text, re.S)
         where = skill.relative_to(ROOT)
         if not m:
@@ -45,7 +45,7 @@ for plugin_dir in sorted((ROOT / "plugins").iterdir()):
         version = version and version.group(1)
         changelog = skill.parent / "CHANGELOG.md"
         if changelog.is_file():
-            top = re.search(r"^## \[([^\]]+)\]", changelog.read_text(), re.M)
+            top = re.search(r"^## \[([^\]]+)\]", changelog.read_text(encoding="utf-8"), re.M)
             if not version:
                 errors.append(f"{where}: has CHANGELOG.md but no metadata.version")
             elif not top or top.group(1) != version:

@@ -1,7 +1,18 @@
-#!/usr/bin/env bash
-# Commit messages are public too.
-set -euo pipefail
-ROOT=$(git rev-parse --show-toplevel)
-lg=(python3 -I "$ROOT/tools/leakguard/leakguard.py")
-[ "$(git config --bool leakguard.requireDenylist || true)" = true ] && lg+=(--require-denylist)
-"${lg[@]}" text "$1"  # '#' lines included: with -m they survive into the commit
+#!/usr/bin/env python3
+"""Commit messages are public too."""
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def leakguard(*args):
+    cmd = [sys.executable, "-I", str(ROOT / "tools/leakguard/leakguard.py")]
+    if subprocess.run(["git", "config", "--bool", "leakguard.requireDenylist"], capture_output=True,
+                      text=True).stdout.strip() == "true":
+        cmd.append("--require-denylist")
+    return cmd + list(args)
+
+
+sys.exit(subprocess.run(leakguard("text", sys.argv[1])).returncode)  # '#' lines included: with -m they survive

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Set up (or repair) this machine for ivan-the-terminal. Idempotent; safe to re-run.
+# Set up (or repair) this machine for ivan-the-terminal. Idempotent; safe to re-run. Linux only (systemd, brew,
+# symlinks); Windows gets bin/bootstrap.ps1 when that port lands.
 set -euo pipefail
 ITT_HOME="${ITT_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
 PRIVATE_DIR="${ITT_PRIVATE_DIR:-$(dirname "$ITT_HOME")/ivan-the-terrible}"

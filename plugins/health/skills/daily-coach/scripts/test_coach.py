@@ -219,6 +219,7 @@ class ServerTest(unittest.TestCase):
 
 
 class GuardTest(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "guards the Bash tool with POSIX paths; Windows headless runs are on the roadmap")
     def run_guard(self, tool, args, domains=("example.org",)):
         p = subprocess.run([sys.executable, "-I", str(HERE / "guard.py"), "/t", "/w", *domains],
                            input=json.dumps({"tool_name": tool, "tool_input": args}), capture_output=True, text=True)

@@ -91,7 +91,7 @@ def load_conf():
     conf = {"TV_ADB": "", "APPS": "stremio stremio-boot smarttube tailscale",
             "AUTOSTART": "stremio", "ALWAYS_ON_VPN": "tailscale", "DISABLE": "", "WEEKLY_DAYS": "7"}
     if CONF.is_file():
-        for line in CONF.read_text().splitlines():
+        for line in CONF.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 key, value = line.split("=", 1)
