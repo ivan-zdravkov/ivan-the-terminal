@@ -15,6 +15,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -252,7 +253,7 @@ def report(rows, as_json=False, verbose=False):
 
 def notify(summary, rows):
     lines = [f"{c} {d}" for lvl, c, d in rows if lvl != "ok"]
-    if lines and subprocess.run(["sh", "-c", "command -v notify-send"], capture_output=True).returncode == 0:
+    if lines and shutil.which("notify-send"):
         subprocess.run(["notify-send", "-a", "tv", summary, "\n".join(lines[:6])])
 
 

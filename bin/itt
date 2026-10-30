@@ -21,9 +21,9 @@ def entry_point(skill):
     """The script `itt run SKILL` executes. run.py is portable; run.sh and run.ps1 are per-OS."""
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", skill):
         return None
-    native = ("run.ps1",) if WINDOWS else ("run.sh", "run")
+    native = "run.ps1" if WINDOWS else "run.sh"
     for d in sorted(ITT_HOME.glob(f"plugins/*/skills/{skill}/scripts")):
-        for name in ("run.py", *native):
+        for name in ("run.py", native):
             if (d / name).is_file():
                 return d / name
     return None

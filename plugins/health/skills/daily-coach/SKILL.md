@@ -7,7 +7,7 @@ description: Run, tune or debug the daily health coach - ring/Apple Health data 
 
 Pieces (all in this skill):
 - `scripts/coach.py`: SQLite store, the Daily app (check-in, trends, push), `/ingest` for the iPhone, CLI.
-- `scripts/run`: the headless morning run behind `scripts/guard.py`. The run has no mail or MCP tools at all.
+- `scripts/run.py`: the headless morning run behind `scripts/guard.py`. The run has no mail or MCP tools at all.
 - `references/prompt.md` (coaching procedure), `references/method.md` (why it works this way, with sources), `references/iphone-shortcut.md` (ring sync and automations).
 - The shared app shell is `tools/webapp/` in the repo, set up as in `docs/phone-apps.md`.
 
@@ -29,7 +29,7 @@ Private: `~/.config/ivan-the-terminal/daily-coach/{config.env,profile.md}` (temp
 - **Tests:** `python3 -I -m unittest discover -s scripts`.
 
 ## Safety invariants
-- The run reads untrusted recipe pages. Never add interpreters, an unrestricted Read/Write, MCP tools (Gmail or any other), or `coach notify`/`serve` to `scripts/run`'s allowlist, and never weaken `guard.py`. WebFetch is limited to `WEB_DOMAINS`.
+- The run reads untrusted recipe pages. Never add interpreters, an unrestricted Read/Write, MCP tools (Gmail or any other), or `coach.py notify`/`serve` to `scripts/run.py`'s allowlist, and never weaken `guard.py`. WebFetch is limited to `WEB_DOMAINS`.
 - The server binds to localhost only; `tailscale serve` (never Funnel) publishes it on the tailnet. Every path sits under the secret `TOKEN`.
 - Push subscriptions are accepted only for real push services (`webapp.PUSH_HOSTS`), so the server can't be made to POST anywhere else.
 - Not medical advice: the plan nudges, it doesn't diagnose. Illness flags lower the day's load and suggest a doctor when they persist.

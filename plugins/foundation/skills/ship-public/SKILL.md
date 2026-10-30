@@ -18,7 +18,7 @@ Pushing a branch publishes it: PR refs stay public even after a squash merge. So
 6. **Review:** run the `/security-review` skill on the branch and fix anything real. If you changed anything, repeat 3–5.
 7. **Push:** `git push -u origin HEAD`. The pre-push hook re-scans.
 8. **PR:** `gh pr create --title "<conventional title>" --body-file <tmp>`. The body covers what and why, plus a `Security:` line with the interview, ship-check and security-review results. The PR text is public and scanned too.
-9. **Merge:** `gh pr merge --auto --squash --delete-branch`. Required checks: leakguard, gitleaks, tests. Watch with `gh pr checks --watch`. Fix failures on the same branch.
+9. **Merge:** `gh pr merge --auto --squash --delete-branch`. Required checks: leakguard, gitleaks, tests, tests-windows. Watch with `gh pr checks --watch`. Fix failures on the same branch.
 10. **Sync:** `git switch main && git pull --ff-only`. Report the PR URL in one line.
 
 If private data was ever pushed: stop, tell Ivan, and follow SECURITY.md "If something leaks". Rotate first, then purge.

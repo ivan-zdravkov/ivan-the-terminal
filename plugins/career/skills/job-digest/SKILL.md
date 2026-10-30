@@ -6,9 +6,9 @@ description: Run, test, tune or debug the weekday job digest - a headless run th
 # Job digest
 
 - **Pieces:**
-  - `scripts/run`: runner with a least-privilege allowlist, no sending at all.
+  - `scripts/run.py`: runner with a least-privilege allowlist, no sending at all.
   - `scripts/guard.py`: fail-closed guard for Gmail, Write and Bash.
-  - `scripts/fetch`, `scripts/q`, `scripts/html`: the only tools the run can execute, confined to its work dir.
+  - `scripts/fetch.py`, `scripts/q.py`, `scripts/page.py`: the only tools the run can execute, confined to its work dir.
   - `scripts/jobs.py`: digest store, marks, the Jobs app, `history` for the run. Shared app shell: `tools/webapp/`, set up as in `docs/phone-apps.md`.
   - `references/prompt.md`: the procedure.
 - **Private:** `~/.config/ivan-the-terminal/job-digest/{config.env,profile.md}` (who, wants, rates, filters, search terms, signature; app PORT/PUBLIC_URL). A user timer (in the private overlay) runs `itt run job-digest` on weekday mornings. `job-digest-server.service` serves the app. Data: `~/.local/share/ivan-the-terminal/job-digest/`.
@@ -22,6 +22,6 @@ description: Run, test, tune or debug the weekday job digest - a headless run th
 - **Tune what it looks for** (rates, stack, boards, queries, conflicts): edit the private `profile.md`, never the public prompt. Change `references/prompt.md` only for generic procedure fixes, and ship those via ship-public.
 - **Safety invariants:**
   - The run reads untrusted mail and web pages, so assume prompt injection.
-  - Never add interpreters (`python3`, `curl`, `jq`, `grep`), an unrestricted `Read`/`Write`, `jobs serve|notify`, or send/reply/forward/update-draft tools to the allowlist, and never weaken `guard.py`.
+  - Never add interpreters (`python3`, `curl`, `jq`, `grep`), an unrestricted `Read`/`Write`, `jobs.py serve|notify`, or send/reply/forward/update-draft tools to the allowlist, and never weaken `guard.py`.
   - Outreach is drafts (no attachments) labelled "Job Search/Attach CV"; Ivan sends them.
   - The app server binds to localhost only, behind `tailscale serve` (never Funnel) and the secret token. It escapes everything the run stores and accepts only https links.

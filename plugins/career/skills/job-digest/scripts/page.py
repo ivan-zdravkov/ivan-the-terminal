@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-"""html MODE NAME [REGEX]: read a page saved by fetch (work dir only) and print compact results.
+#!/usr/bin/env -S python3 -I
+"""page MODE NAME [REGEX]: read a page saved by fetch (work dir only) and print compact results.
   links  NAME [REGEX]  anchor text <TAB> absolute href, optionally only hrefs/text matching REGEX
   emails NAME          e-mail addresses found anywhere in the source (incl. mailto: and lightly obfuscated)
   text   NAME          visible text, whitespace-collapsed, first 20k chars

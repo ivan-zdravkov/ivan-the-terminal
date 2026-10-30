@@ -238,12 +238,13 @@ class GuardTest(unittest.TestCase):
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/plan.json"}), 0)
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/../etc/x"}), 2)
         self.assertEqual(self.run_guard("Edit", {"file_path": "/etc/profile"}), 2)
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach context"}), 0)
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach serve"}), 2)
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach notify"}), 2)  # the runner pushes, not the model
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach context; rm -rf ~"}), 2)
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach status#;/t/coach url"}), 2)  # mid-word '#'
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach status $(id)"}), 2)
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py context"}), 0)
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py serve"}), 2)
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach context"}), 2)  # pre-.py name
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py notify"}), 2)  # the runner pushes, not the model
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py context; rm -rf ~"}), 2)
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py status#;/t/coach.py url"}), 2)  # mid-word '#'
+        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py status $(id)"}), 2)
         self.assertEqual(self.run_guard("Bash", {"command": "python3 -c 1"}), 2)
 
 

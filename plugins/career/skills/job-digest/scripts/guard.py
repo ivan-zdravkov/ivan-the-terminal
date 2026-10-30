@@ -6,7 +6,8 @@
 - create_draft: no attachments (the candidate attaches the CV by hand)
 - label_* / unlabel_thread: never TRASH/SPAM; unlabel may only remove INBOX/UNREAD (archive)
 - Write/Edit: only files inside WORK_DIR
-- Bash: a single call to a helper in TOOLS_DIR (fetch, q, html, jobs history|digest-set|has-digest) or `date`;
+- Bash: a single call to a helper in TOOLS_DIR (fetch.py, q.py, page.py, jobs.py history|digest-set|has-digest)
+  or `date`;
   no chaining, redirects or substitution
 """
 import json
@@ -16,7 +17,7 @@ import sys
 from pathlib import Path
 
 SYSTEM_LABELS = {"TRASH", "SPAM"}
-HELPERS = ("fetch", "q", "html")
+HELPERS = ("fetch.py", "q.py", "page.py")
 JOBS = {"history", "digest-set", "has-digest"}
 
 
@@ -56,13 +57,13 @@ def check(tools_dir, work, event):
         if not words or any(set(w) <= set("();<>|&") for w in words):
             block("one plain command per call: no pipes, chaining or redirects")
         exe = words[0]
-        if exe == str(Path(tools_dir) / "jobs"):
+        if exe == str(Path(tools_dir) / "jobs.py"):
             if len(words) < 2 or words[1] not in JOBS:
-                block(f"jobs may only run {sorted(JOBS)}")
+                block(f"jobs.py may only run {sorted(JOBS)}")
             return
         helpers = {str(Path(tools_dir) / n) for n in HELPERS}
         if exe not in helpers and exe != "date":
-            block(f"Bash may only run {sorted(helpers)}, jobs {sorted(JOBS)} or date")
+            block(f"Bash may only run {sorted(helpers)}, jobs.py {sorted(JOBS)} or date")
 
 
 def main():

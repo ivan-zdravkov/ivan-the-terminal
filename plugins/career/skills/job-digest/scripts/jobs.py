@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -I
 """job-digest: stored digests and your marks on jobs in one SQLite file, plus the Jobs phone app. Stdlib only.
 
   jobs.py serve              HTTP server: the Jobs app (config: BIND, PORT)
