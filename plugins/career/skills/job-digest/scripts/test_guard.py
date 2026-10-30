@@ -41,6 +41,7 @@ class Guard(unittest.TestCase):
         self.assertEqual(2, guard(G + "unlabel_thread", {"labelIds": ["IMPORTANT"]}))
         self.assertEqual(2, guard(G + "label_thread", {"labelIds": ["TRASH"]}))
 
+    @unittest.skipIf(os.name == "nt", "guards the Bash tool with POSIX paths; Windows headless runs are on the roadmap")
     def test_bash_only_single_helper_calls(self):
         ok = [f"{HERE}/fetch 'https://example.com/a?x=1&y=2' feed.json", f"{HERE}/q feed.json '.[] | .title'",
               f"{HERE}/html links page.html 'project'", "date +%F", f"{HERE}/jobs history",
@@ -56,6 +57,7 @@ class Guard(unittest.TestCase):
             self.assertEqual(2, guard("Bash", {"command": cmd}), cmd)
 
 
+@unittest.skipIf(os.name == "nt", "fetch, q and html are shell wrappers until their Python port")
 class Helpers(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

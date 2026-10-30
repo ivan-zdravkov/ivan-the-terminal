@@ -194,11 +194,11 @@ class GitBypasses(unittest.TestCase):
 
     def test_utf16_and_nul_content_is_scanned(self):
         (self.repo / "u16.txt").write_bytes(f"{self.NAME}\n".encode("utf-16"))
-        (self.repo / "nul.txt").write_bytes(b"x\0\n" + self.NAME.encode())
+        (self.repo / "nulbyte.txt").write_bytes(b"x\0\n" + self.NAME.encode())
         self.git("add", "-A")
         for mode in ("staged", "tree"):
             hit_files = {f.split(":")[0].split(" ")[0] for f in self.scan(mode)}
-            self.assertEqual({"u16.txt", "nul.txt"}, hit_files, mode)
+            self.assertEqual({"u16.txt", "nulbyte.txt"}, hit_files, mode)
 
     def test_diff_attribute_does_not_hide_content(self):
         (self.repo / ".gitattributes").write_text("*.md -diff\n")

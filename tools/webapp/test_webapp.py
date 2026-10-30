@@ -1,6 +1,7 @@
 import base64
 import importlib.util
 import json
+import os
 import struct
 import subprocess
 import tempfile
@@ -69,12 +70,14 @@ class PushTest(unittest.TestCase):
         self.push.subscribe({"endpoint": "https://web.push.apple.com/14"})
         self.assertEqual(len(self.push.subs()), webapp.MAX_SUBS)
         self.assertEqual(self.push.subs()[-1], "https://web.push.apple.com/14")
-        self.assertEqual(Path(self.tmp.name, "push.json").stat().st_mode & 0o777, 0o600)
+        if os.name == "posix":  # Windows has no mode bits; the profile ACL protects it
+            self.assertEqual(Path(self.tmp.name, "push.json").stat().st_mode & 0o777, 0o600)
 
     def test_vapid_jwt_verifies(self):
         key = unb64u(self.push.public_key())
         self.assertEqual((len(key), key[0]), (65, 4))
-        self.assertEqual(Path(self.tmp.name, "vapid.pem").stat().st_mode & 0o777, 0o600)
+        if os.name == "posix":  # Windows has no mode bits; the profile ACL protects it
+            self.assertEqual(Path(self.tmp.name, "vapid.pem").stat().st_mode & 0o777, 0o600)
         self.assertEqual(self.push.public_key(), webapp.b64u(key))  # stable: the key is made once
         token = self.push.jwt("https://web.push.apple.com/abc")
         h, c, s = token.split(".")
