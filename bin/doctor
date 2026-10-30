@@ -1,104 +1,186 @@
-#!/usr/bin/env bash
-# shellcheck disable=SC2015  # `test && r ok || r fail` is safe: r() always succeeds
-# Health check for ivan-the-terminal. Prints problems only (-v: everything) and a summary line.
-#   --update   upgrade outdated brew-managed tools first
-set -uo pipefail
-ITT_HOME="${ITT_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
-PRIVATE_DIR="${ITT_PRIVATE_DIR:-$(dirname "$ITT_HOME")/ivan-the-terrible}"
-CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
-verbose=0 update=0
-for a in "$@"; do case "$a" in -v) verbose=1 ;; --update) update=1 ;; esac; done
+#!/usr/bin/env python3
+"""Health check for ivan-the-terminal. Prints problems only (-v: everything) and a summary line.
+  --update   upgrade outdated brew-managed tools first
+Stdlib only; Linux and Windows (systemd and shell-link checks are Linux-only).
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
-out=()
-r() { out+=("$1"$'\t'"$2"$'\t'"$3"); }
+ITT_HOME = Path(os.environ.get("ITT_HOME") or Path(__file__).resolve().parents[1])
+PRIVATE_DIR = Path(os.environ.get("ITT_PRIVATE_DIR") or ITT_HOME.parent / "ivan-the-terrible")
+CFG = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+HOME = Path.home()
+LINUX = sys.platform.startswith("linux")
+out = []
 
-# --- toolchain: present and current
-export HOMEBREW_NO_AUTO_UPDATE=1
-if [ $update = 1 ]; then brew update -q >/dev/null 2>&1; fi
-outdated=$(brew outdated --quiet 2>/dev/null || true)
-while read -r cmd formula purpose; do
-  case "$cmd" in ''|'#'*) continue ;; esac
-  if ! command -v "$cmd" >/dev/null; then r fail "tool:$cmd" "missing ($purpose): itt bootstrap"; continue; fi
-  brew_managed=0; [[ "$(command -v "$cmd")" == "$(brew --prefix 2>/dev/null)"/* ]] && brew_managed=1
-  if [ $brew_managed = 1 ] && grep -qx "${formula%%@*}\(@.*\)\?" <<<"$outdated"; then
-    if [ $update = 1 ] && brew upgrade -q "$formula" >/dev/null 2>&1; then r ok "tool:$cmd" "upgraded"
-    else r warn "tool:$cmd" "update available: itt doctor --update"; fi
-  else
-    r ok "tool:$cmd" "$("$cmd" --version 2>&1 | head -1)"
-  fi
-done < "$ITT_HOME/toolchain.txt"
-gh_path=$(command -v gh || true)
-if [ -n "$gh_path" ] && [[ "$gh_path" != /home/linuxbrew/* ]]; then  # not brew-managed: compare with latest release
-  have=$(gh --version | head -1 | awk '{print $3}')
-  latest=$(gh api repos/cli/cli/releases/latest -q .tag_name 2>/dev/null | tr -d v)
-  [ -n "$latest" ] && [ "$have" != "$latest" ] && r warn tool:gh-version "$have at $gh_path, latest $latest: brew install gh (then remove the old binary)"
-fi
 
-# --- auth
-if gh auth status >/dev/null 2>&1; then r ok gh-auth ""; else r fail gh-auth "gh auth login -p ssh"; fi
-key="$HOME/.ssh/id_ed25519"
-if [ -f "$key" ]; then
-  if ssh-keygen -y -P "" -f "$key" >/dev/null 2>&1; then r warn ssh-passphrase "$key has no passphrase: ssh-keygen -p -f $key"
-  else r ok ssh-passphrase ""; fi
-fi
-ssh_out=$(ssh -o BatchMode=yes -o ConnectTimeout=5 -T git@github.com 2>&1 || true)  # exits 1 even on success
-if grep -q "successfully authenticated" <<<"$ssh_out"; then r ok github-ssh ""
-else r fail github-ssh "ssh -T git@github.com failed (agent unlocked? key on GitHub?)"; fi
+def r(level, check, detail=""):
+    out.append((level, check, detail))
 
-# --- guards
-[ "$(git -C "$ITT_HOME" config core.hooksPath)" = .githooks ] && r ok git-hooks "" || r fail git-hooks "itt bootstrap"
-for h in pre-commit commit-msg pre-push; do [ -x "$ITT_HOME/.githooks/$h" ] || r fail "hook:$h" "missing or not executable"; done
-jq -e '.hooks.PreToolUse[]?.hooks[]?.command | select(test("leakguard"))' "$ITT_HOME/.claude/settings.json" >/dev/null 2>&1 \
-  && r ok claude-hook "" || r fail claude-hook ".claude/settings.json lost its leakguard PreToolUse hook"
-if [ -s "$CFG/ivan-the-terminal/leakguard.denylist" ]; then r ok denylist ""
-else r warn denylist "no private denylist: generic rules only"; fi
-if (cd "$ITT_HOME" && python3 -I tools/leakguard/leakguard.py tree 2>/dev/null); then r ok leak-scan "tree clean"
-else r fail leak-scan "tracked files contain findings: itt guard tree"; fi
 
-# --- links
-[ "$(readlink -f "$HOME/.bashrc.d/claude-home.sh")" = "$ITT_HOME/shell/claude-home.bash" ] && r ok claude-home "" \
-  || r warn claude-home "interactive claude won't start in ivan-the-terminal: itt bootstrap"
-[ "$(readlink -f "$(command -v itt 2>/dev/null)")" = "$ITT_HOME/bin/itt" ] && r ok itt-path "" || r warn itt-path "itt not on PATH: itt bootstrap"
-for s in "$ITT_HOME"/plugins/*/skills/*/; do
-  n=$(basename "$s")
-  [ "$(readlink -f "$HOME/.claude/skills/$n")" = "$(readlink -f "$s")" ] || r warn "skill:$n" "not linked: itt bootstrap"
-done
+def sh(*cmd, **kw):
+    """Run CMD quietly; CompletedProcess with text stdout (returncode 127 when the tool is missing)."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, **kw)
+    except (FileNotFoundError, NotADirectoryError):
+        return subprocess.CompletedProcess(cmd, 127, "", "")
 
-for timer in "$ITT_HOME"/plugins/*/systemd/*.timer; do
-  [ -e "$timer" ] || continue
-  systemctl --user is-enabled -q "$(basename "$timer")" 2>/dev/null && r ok "timer:$(basename "$timer" .timer)" "" \
-    || r warn "timer:$(basename "$timer" .timer)" "not enabled: itt bootstrap"
-done
-for svc in "$ITT_HOME"/plugins/*/systemd/*.service; do
-  grep -q '^\[Install\]' "$svc" 2>/dev/null || continue
-  systemctl --user is-active -q "$(basename "$svc")" 2>/dev/null && r ok "service:$(basename "$svc" .service)" "" \
-    || r warn "service:$(basename "$svc" .service)" "not running: itt bootstrap, then systemctl --user status $(basename "$svc")"
-done
 
-# --- GitHub-side protection (skipped offline)
-slug=$(git -C "$ITT_HOME" remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')
-if [ -n "$slug" ]; then
-  checks=$(gh api "repos/$slug/branches/main/protection" -q '.required_status_checks.contexts | sort | join(",")' 2>/dev/null)
-  if [ "$checks" = "gitleaks,leakguard,tests" ]; then r ok branch-protection ""
-  elif [ -n "$checks" ]; then r warn branch-protection "required checks are '$checks'"
-  else r fail branch-protection "main is not protected on $slug"; fi
-  pp=$(gh api "repos/$slug" -q '.security_and_analysis.secret_scanning_push_protection.status' 2>/dev/null)
-  [ "$pp" = enabled ] && r ok push-protection "" || r warn push-protection "GitHub secret push protection is '${pp:-unknown}'"
-fi
+def same(a, b):
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except OSError:
+        return False
 
-# --- private overlay
-if [ -x "$PRIVATE_DIR/bin/doctor" ]; then
-  while IFS=$'\t' read -r l c d; do r "$l" "private:$c" "$d"; done < <("$PRIVATE_DIR/bin/doctor")
-else
-  r warn private-overlay "not found at $PRIVATE_DIR (generic mode)"
-fi
 
-# --- report
-ok=0 warn=0 fail=0
-for line in "${out[@]}"; do
-  IFS=$'\t' read -r l c d <<<"$line"
-  case "$l" in ok) ok=$((ok+1)) ;; warn) warn=$((warn+1)) ;; fail) fail=$((fail+1)) ;; esac
-  if [ "$l" != ok ] || [ $verbose = 1 ]; then printf '%-4s %-26s %s\n' "$l" "$c" "$d"; fi
-done
-if [ $((warn+fail)) = 0 ]; then echo "doctor: all green ($ok checks)"; else echo "doctor: $ok ok, $warn warn, $fail fail"; fi
-[ $fail = 0 ]
+def toolchain(update):
+    brew, prefix, outdated = shutil.which("brew"), "", set()
+    if brew:
+        os.environ["HOMEBREW_NO_AUTO_UPDATE"] = "1"
+        if update:
+            sh(brew, "update", "-q")
+        outdated = {re.sub(r"@.*", "", line) for line in sh(brew, "outdated", "--quiet").stdout.split()}
+        prefix = sh(brew, "--prefix").stdout.strip()
+    for line in (ITT_HOME / "toolchain.txt").read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        cmd, formula, purpose = (line.split(None, 2) + ["", ""])[:3]
+        path = shutil.which(cmd)
+        if not path:
+            r("fail", f"tool:{cmd}", f"missing ({purpose}): itt bootstrap")
+        elif brew and prefix and path.startswith(prefix + "/") and re.sub(r"@.*", "", formula) in outdated:
+            if update and sh(brew, "upgrade", "-q", formula).returncode == 0:
+                r("ok", f"tool:{cmd}", "upgraded")
+            else:
+                r("warn", f"tool:{cmd}", "update available: itt doctor --update")
+        else:
+            version = sh(path, "--version")
+            r("ok", f"tool:{cmd}", ((version.stdout or version.stderr).splitlines() or [""])[0])
+    gh = shutil.which("gh")
+    if gh and not (brew and prefix and gh.startswith(prefix + "/")):  # not brew-managed: compare with latest
+        have = (sh(gh, "--version").stdout.split() + ["", "", ""])[2]
+        latest = sh(gh, "api", "repos/cli/cli/releases/latest", "-q", ".tag_name").stdout.strip().lstrip("v")
+        if latest and have != latest:
+            r("warn", "tool:gh-version", f"{have} at {gh}, latest {latest}: update gh (then remove the old binary)")
+
+
+def auth():
+    r(*(("ok", "gh-auth") if sh("gh", "auth", "status").returncode == 0 else ("fail", "gh-auth", "gh auth login -p ssh")))
+    key = HOME / ".ssh/id_ed25519"
+    if key.is_file():
+        if sh("ssh-keygen", "-y", "-P", "", "-f", str(key)).returncode == 0:
+            r("warn", "ssh-passphrase", f"{key} has no passphrase: ssh-keygen -p -f {key}")
+        else:
+            r("ok", "ssh-passphrase")
+    ssh = sh("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-T", "git@github.com")  # exits 1 on success
+    if "successfully authenticated" in ssh.stdout + ssh.stderr:
+        r("ok", "github-ssh")
+    else:
+        r("fail", "github-ssh", "ssh -T git@github.com failed (agent unlocked? key on GitHub?)")
+
+
+def guards():
+    hooks_path = sh("git", "-C", str(ITT_HOME), "config", "core.hooksPath").stdout.strip()
+    r(*(("ok", "git-hooks") if hooks_path == ".githooks" else ("fail", "git-hooks", "itt bootstrap")))
+    for h in ("pre-commit", "commit-msg", "pre-push"):
+        hook = ITT_HOME / ".githooks" / h
+        if not hook.is_file() or (os.name == "posix" and not os.access(hook, os.X_OK)):
+            r("fail", f"hook:{h}", "missing or not executable")
+    try:
+        settings = json.loads((ITT_HOME / ".claude/settings.json").read_text(encoding="utf-8"))
+        commands = [h.get("command", "") for e in settings.get("hooks", {}).get("PreToolUse", []) for h in e.get("hooks", [])]
+        ok = any("leakguard" in c for c in commands)
+    except (OSError, ValueError, AttributeError):
+        ok = False
+    r(*(("ok", "claude-hook") if ok else ("fail", "claude-hook", ".claude/settings.json lost its leakguard PreToolUse hook")))
+    denylist = CFG / "ivan-the-terminal/leakguard.denylist"
+    if denylist.is_file() and denylist.stat().st_size:
+        r("ok", "denylist")
+    else:
+        r("warn", "denylist", "no private denylist: generic rules only")
+    if sh(sys.executable, "-I", "tools/leakguard/leakguard.py", "tree", cwd=ITT_HOME).returncode == 0:
+        r("ok", "leak-scan", "tree clean")
+    else:
+        r("fail", "leak-scan", "tracked files contain findings: itt guard tree")
+
+
+def links():
+    if LINUX:
+        if same(HOME / ".bashrc.d/claude-home.sh", ITT_HOME / "shell/claude-home.bash"):
+            r("ok", "claude-home")
+        else:
+            r("warn", "claude-home", "interactive claude won't start in ivan-the-terminal: itt bootstrap")
+    itt = shutil.which("itt")
+    r(*(("ok", "itt-path") if itt and same(itt, ITT_HOME / "bin/itt") else ("warn", "itt-path", "itt not on PATH: itt bootstrap")))
+    for s in sorted(ITT_HOME.glob("plugins/*/skills/*/SKILL.md")):
+        if not same(HOME / ".claude/skills" / s.parent.name, s.parent):
+            r("warn", f"skill:{s.parent.name}", "not linked: itt bootstrap")
+
+
+def scheduler():
+    if not LINUX:
+        return  # Windows: Task Scheduler port pending (docs/roadmap.md)
+    for timer in sorted(ITT_HOME.glob("plugins/*/systemd/*.timer")):
+        if sh("systemctl", "--user", "is-enabled", "-q", timer.name).returncode == 0:
+            r("ok", f"timer:{timer.stem}")
+        else:
+            r("warn", f"timer:{timer.stem}", "not enabled: itt bootstrap")
+    for svc in sorted(ITT_HOME.glob("plugins/*/systemd/*.service")):
+        if "\n[Install]" not in "\n" + svc.read_text(encoding="utf-8"):
+            continue
+        if sh("systemctl", "--user", "is-active", "-q", svc.name).returncode == 0:
+            r("ok", f"service:{svc.stem}")
+        else:
+            r("warn", f"service:{svc.stem}", f"not running: itt bootstrap, then systemctl --user status {svc.name}")
+
+
+def github():  # skipped offline
+    url = sh("git", "-C", str(ITT_HOME), "remote", "get-url", "origin").stdout.strip()
+    slug = re.sub(r"\.git$", "", re.sub(r"^(git@github\.com:|https://github\.com/)", "", url))
+    if not slug:
+        return
+    checks = sh("gh", "api", f"repos/{slug}/branches/main/protection",
+                "-q", '.required_status_checks.contexts | sort | join(",")').stdout.strip()
+    if checks == "gitleaks,leakguard,tests":
+        r("ok", "branch-protection")
+    elif checks:
+        r("warn", "branch-protection", f"required checks are '{checks}'")
+    else:
+        r("fail", "branch-protection", f"main is not protected on {slug}")
+    pp = sh("gh", "api", f"repos/{slug}", "-q", ".security_and_analysis.secret_scanning_push_protection.status").stdout.strip()
+    r(*(("ok", "push-protection") if pp == "enabled" else ("warn", "push-protection", f"GitHub secret push protection is '{pp or 'unknown'}'")))
+
+
+def overlay():
+    doctor = PRIVATE_DIR / "bin/doctor"
+    if not (doctor.is_file() and os.access(doctor, os.X_OK)) or os.name != "posix":
+        r("warn", "private-overlay", f"no runnable doctor at {doctor} (generic mode)")
+        return
+    for line in sh(str(doctor)).stdout.splitlines():
+        level, check, detail = (line.split("\t") + ["", ""])[:3]
+        r(level, f"private:{check}", detail)
+
+
+def main(args):
+    verbose, update = "-v" in args, "--update" in args
+    for section in (lambda: toolchain(update), auth, guards, links, scheduler, github, overlay):
+        section()
+    counts = {"ok": 0, "warn": 0, "fail": 0}
+    for level, check, detail in out:
+        counts[level] = counts.get(level, 0) + 1
+        if level != "ok" or verbose:
+            print(f"{level:<4} {check:<26} {detail}".rstrip())
+    if counts["warn"] + counts["fail"] == 0:
+        print(f"doctor: all green ({counts['ok']} checks)")
+    else:
+        print(f"doctor: {counts['ok']} ok, {counts['warn']} warn, {counts['fail']} fail")
+    return 1 if counts["fail"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

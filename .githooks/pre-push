@@ -1,16 +1,34 @@
-#!/usr/bin/env bash
-# Last local gate: pushing a branch to a public remote publishes it, so scan every outgoing commit.
-set -euo pipefail
-ROOT=$(git rev-parse --show-toplevel)
-lg=(python3 -I "$ROOT/tools/leakguard/leakguard.py")
-[ "$(git config --bool leakguard.requireDenylist || true)" = true ] && lg+=(--require-denylist)
-zero=0000000000000000000000000000000000000000
-while read -r _ lsha rref rsha; do
-  [ "$lsha" = "$zero" ] && continue  # branch deletion
-  if [ "$rref" = refs/heads/main ] && [ "${ITT_ALLOW_MAIN_PUSH:-}" != 1 ]; then
-    echo "pre-push: main only changes through PRs (ship-public skill)" >&2; exit 1
-  fi
-  if [ "$rsha" = "$zero" ]; then base=$(git merge-base "$lsha" origin/main 2>/dev/null || echo --root); else base=$rsha; fi
-  "${lg[@]}" range "$base" "$lsha"
-done
-gitleaks git --redact --no-banner --log-level warn "$ROOT"
+#!/usr/bin/env python3
+"""Last local gate: pushing a branch to a public remote publishes it, so scan every outgoing commit."""
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+ZERO = "0" * 40
+
+
+def leakguard(*args):
+    cmd = [sys.executable, "-I", str(ROOT / "tools/leakguard/leakguard.py")]
+    if subprocess.run(["git", "config", "--bool", "leakguard.requireDenylist"], capture_output=True,
+                      text=True).stdout.strip() == "true":
+        cmd.append("--require-denylist")
+    return cmd + list(args)
+
+
+for line in sys.stdin:  # "<local ref> <local sha> <remote ref> <remote sha>" per pushed ref
+    _, lsha, rref, rsha = line.split()
+    if lsha == ZERO:
+        continue  # branch deletion
+    if rref == "refs/heads/main" and os.environ.get("ITT_ALLOW_MAIN_PUSH") != "1":
+        sys.exit("pre-push: main only changes through PRs (ship-public skill)")
+    if rsha == ZERO:
+        mb = subprocess.run(["git", "merge-base", lsha, "origin/main"], capture_output=True, text=True)
+        base = mb.stdout.strip() if mb.returncode == 0 else "--root"
+    else:
+        base = rsha
+    if subprocess.run(leakguard("range", base, lsha)).returncode:
+        sys.exit(1)
+if subprocess.run(["gitleaks", "git", "--redact", "--no-banner", "--log-level", "warn", str(ROOT)]).returncode:
+    sys.exit(1)

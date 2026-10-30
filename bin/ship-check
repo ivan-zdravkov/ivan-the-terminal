@@ -1,26 +1,40 @@
-#!/usr/bin/env bash
-# Every gate a branch must pass before it is pushed to the public remote.
-set -euo pipefail
-ITT_HOME="${ITT_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
-cd "$ITT_HOME"
-lg=(python3 -I tools/leakguard/leakguard.py)
-[ "$(git config --bool leakguard.requireDenylist || true)" = true ] && lg+=(--require-denylist)
+#!/usr/bin/env python3
+"""Every gate a branch must pass before it is pushed to the public remote. Stdlib only; Linux and Windows."""
+import os
+import subprocess
+import sys
+from pathlib import Path
 
-if [ -n "$(git status --porcelain)" ]; then
-  echo "ship-check: uncommitted changes; commit or stash first" >&2; exit 1
-fi
-git fetch -q origin 2>/dev/null || true
-base=$(git merge-base HEAD origin/main 2>/dev/null || echo --root)
+ITT_HOME = Path(os.environ.get("ITT_HOME") or Path(__file__).resolve().parents[1])
 
-"${lg[@]}" tree
-"${lg[@]}" range "$base" HEAD
-gitleaks git --redact --no-banner --log-level warn .
-python3 -I -m unittest discover -q -s tools/leakguard 2>&1 | tail -1
-python3 -I -m unittest discover -q -s tools/webapp 2>&1 | tail -1
-for d in plugins/*/skills/*/scripts; do
-  if compgen -G "$d/test_*.py" >/dev/null; then python3 -I -m unittest discover -q -s "$d" 2>&1 | tail -1; fi
-done
-python3 -I tools/lint_skills.py
-shellcheck -x bin/* .githooks/* shell/* plugins/*/skills/*/scripts/run
-if [ "$base" = --root ]; then n=$(git rev-list --count HEAD); else n=$(git rev-list --count "$base..HEAD"); fi
-echo "ship-check: clean ($n commit(s) checked)"
+
+def git(*args):
+    return subprocess.run(["git", *args], cwd=ITT_HOME, capture_output=True, text=True)
+
+
+def gate(*cmd):
+    if subprocess.run([str(c) for c in cmd], cwd=ITT_HOME).returncode:
+        sys.exit(1)  # the failing step already explained itself
+
+
+def main():
+    if git("status", "--porcelain").stdout.strip():
+        sys.exit("ship-check: uncommitted changes; commit or stash first")
+    git("fetch", "-q", "origin")
+    mb = git("merge-base", "HEAD", "origin/main")
+    base = mb.stdout.strip() if mb.returncode == 0 else "--root"
+
+    lg = [sys.executable, "-I", "tools/leakguard/leakguard.py"]
+    if git("config", "--bool", "leakguard.requireDenylist").stdout.strip() == "true":
+        lg.append("--require-denylist")
+    gate(*lg, "tree")
+    gate(*lg, "range", base, "HEAD")
+    gate("gitleaks", "git", "--redact", "--no-banner", "--log-level", "warn", ".")
+    gate(sys.executable, "-I", "tools/run_tests.py", "--shellcheck")
+    gate(sys.executable, "-I", "tools/lint_skills.py")
+    n = git("rev-list", "--count", "HEAD" if base == "--root" else f"{base}..HEAD").stdout.strip()
+    print(f"ship-check: clean ({n} commit(s) checked)")
+
+
+if __name__ == "__main__":
+    main()

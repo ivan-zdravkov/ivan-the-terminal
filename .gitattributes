@@ -1,0 +1,2 @@
+# LF everywhere, also in Windows checkouts: shell scripts and hooks break on CRLF.
+* text=auto eol=lf

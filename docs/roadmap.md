@@ -15,3 +15,13 @@ Skills distilled from months of real sessions, each turned generic here with per
 | **training** | training buddy: progressive overload plans, calendar events (daily-coach covers exercise snacks and check-ins) | fitness subscriptions |
 | **media** | convert-for-legacy-players (e.g. Wii), player troubleshooting | streaming add-ons |
 | **money** | subscription audit → self-hosted replacements | the subscriptions themselves |
+
+## Windows
+
+Skills are portable Python first (see [skill-authoring.md](skill-authoring.md) rule 12). Still Linux-only, each to get a PowerShell twin:
+
+- `itt bootstrap` → `bin/bootstrap.ps1`: winget/scoop toolchain, skill links, `itt` shim on PATH
+- systemd timers and services → Task Scheduler tasks; doctor's scheduler checks
+- headless runs (daily-coach, job-digest) → allowlist and guard for the PowerShell tool
+- homelab-check, system-updates → `run.ps1` (Windows Update, winget, disks, event log)
+- `shell/claude-home.bash` → PowerShell profile; the leakguard Claude hook command in `.claude/settings.json`
