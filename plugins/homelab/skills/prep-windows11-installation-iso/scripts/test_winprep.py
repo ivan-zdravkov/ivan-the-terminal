@@ -274,6 +274,7 @@ class Tune(unittest.TestCase):
         self.assertTrue(call.startswith("& (Join-Path $dir 'tune-windows.ps1') -Taskbar 'center autohide alltray'"))
         self.assertIn("-Pins 'File Explorer, Ivan''s App'", call)
         self.assertIn("-StoreApps ''", call)
+        self.assertIn("-Power '' -Apollo ''", call)
         self.assertNotIn("-Log", call)
 
     def test_install_script_tunes_before_keys(self):

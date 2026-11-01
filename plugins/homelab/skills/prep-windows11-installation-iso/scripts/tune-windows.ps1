@@ -6,6 +6,8 @@
 #   -AutostartOff  wildcard patterns of Run entries to disable (Task Manager's "Disabled", survives app updates)
 #   -Debloat       words: Edge FaxScan CrossDevice
 #   -StoreApps     Microsoft Store ids installed with winget
+#   -Power         words: always-on (no sleep/hibernate), screen:<min> (display off), lock:<min> (idle lock), wol
+#   -Apollo        words: headless (virtual display at the client's resolution + fps), isolated (only that display)
 #   -Logon         only the per-logon part (tray icons, autostart); what the scheduled task runs
 param(
     [string]$Taskbar = 'center autohide alltray',
@@ -13,6 +15,8 @@ param(
     [string]$AutostartOff = '',
     [string]$Debloat = '',
     [string]$StoreApps = '',
+    [string]$Power = '',
+    [string]$Apollo = '',
     [switch]$Logon,
     [string]$Log = ''
 )
@@ -31,9 +35,11 @@ function Step($name, [scriptblock]$body) {
 
 function SetValue($path, $name, $value, $type = 'DWord') {
     if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
-    $old = (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue).$name
-    if ("$old" -ne "$value") { New-ItemProperty -Path $path -Name $name -Value $value -PropertyType $type -Force | Out-Null; return $true }
-    return $false
+    $old = Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue
+    if ($old -and "$($old.$name)" -eq "$value") { return $false }
+    if ($old) { Set-ItemProperty -Path $path -Name $name -Value $value }
+    else { New-ItemProperty -Path $path -Name $name -Value $value -PropertyType $type | Out-Null }
+    return $true
 }
 
 function PromoteTrayIcons {
@@ -87,12 +93,16 @@ if ($remove -contains 'Edge') {
         SetValue 'HKLM:\SOFTWARE\Microsoft\EdgeUpdate' 'DoNotUpdateToEdgeWithChromium' 1 | Out-Null
         $exe = Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'
         if (-not (Test-Path $exe)) { return 'not installed' }
+        # Edge checks the device region (set in OOBE, only TrustedInstaller may change it), not the home location
+        $region = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Control Panel\DeviceRegion' -ErrorAction SilentlyContinue).DeviceRegion
+        $geo = (Get-ItemProperty 'HKCU:\Control Panel\International\Geo').Nation
+        if ($region -and "$region" -ne "$geo") { return "kept: the device region is GeoID $region (home location $geo); Edge only uninstalls in the EEA" }
         $setup = Get-ChildItem (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\*\Installer\setup.exe') |
             Sort-Object LastWriteTime | Select-Object -Last 1
         # the arguments of Settings > Apps > Uninstall, without asking
         Start-Process $setup.FullName -ArgumentList '--uninstall', '--msedge', '--channel=stable', '--system-level', '--force-uninstall' -Wait
         Get-AppxPackage -AllUsers Microsoft.MicrosoftEdge.Stable | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-        if (Test-Path $exe) { 'FAILED: still installed (outside the EEA Edge refuses to uninstall)' } else { 'removed' }
+        if (Test-Path $exe) { 'FAILED: still installed (Edge only uninstalls in EEA regions; see msedge_installer.log in SystemTemp)' } else { 'removed' }
     }
 }
 if ($remove -contains 'FaxScan') {
@@ -133,6 +143,94 @@ Step 'gaming' {
         $c += 'windowed-game optimizations on'
     }
     if ($c) { $c -join ', ' }
+}
+
+# ---- power: an always-on host (game streaming, scheduled automation) ------------------------------
+$pw = $Power.ToLower().Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
+function PowerIndex($sub, $setting) {
+    $out = powercfg /query SCHEME_CURRENT $sub $setting | Select-String 'Current AC Power Setting Index: 0x([0-9a-f]+)'
+    if ($out) { [Convert]::ToInt32($out.Matches[0].Groups[1].Value, 16) } else { -1 }
+}
+function SetPower($sub, $setting, $seconds) {
+    if ((PowerIndex $sub $setting) -eq $seconds) { return $false }
+    powercfg /setacvalueindex SCHEME_CURRENT $sub $setting $seconds
+    powercfg /setdcvalueindex SCHEME_CURRENT $sub $setting $seconds
+    powercfg /setactive SCHEME_CURRENT
+    return $true
+}
+if ($pw) {
+    Step 'power' {
+        $c = @()
+        if ($pw -contains 'always-on') {
+            if (SetPower SUB_SLEEP STANDBYIDLE 0) { $c += 'sleep never' }
+            if (SetPower SUB_SLEEP HIBERNATEIDLE 0) { $c += 'hibernate never' }
+            if (SetPower SUB_DISK DISKIDLE 0) { $c += 'disks never off' }
+            if ((Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power').HibernateEnabled -ne 0) {
+                powercfg /hibernate off; $c += 'hibernation off'
+            }
+        }
+        foreach ($w in $pw) {
+            if ($w -match '^screen:(\d+)$' -and (SetPower SUB_VIDEO VIDEOIDLE ([int]$Matches[1] * 60))) { $c += "screen off after $($Matches[1]) min" }
+            if ($w -match '^lock:(\d+)$') {
+                # "Interactive logon: machine inactivity limit": locks the session after that much idle time
+                $secs = [int]$Matches[1] * 60
+                if (SetValue 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' 'InactivityTimeoutSecs' $secs) { $c += "lock after $($Matches[1]) min" }
+            }
+        }
+        if ($c) { $c -join ', ' }
+    }
+}
+if ($pw -contains 'wol') {
+    Step 'wake-on-LAN' {
+        $c = @()
+        $class = 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}'
+        foreach ($n in Get-NetAdapter -Physical | Where-Object { $_.PhysicalMediaType -eq '802.3' }) {
+            $before = $c.Count
+            # driver settings, where the driver has them: magic packet, and wake from shutdown (S5)
+            foreach ($kw in '*WakeOnMagicPacket', 'S5WakeOnLan') {
+                $p = Get-NetAdapterAdvancedProperty -Name $n.Name -RegistryKeyword $kw -ErrorAction SilentlyContinue
+                if ($p -and "$($p.RegistryValue)" -ne '1') { Set-NetAdapterAdvancedProperty -Name $n.Name -RegistryKeyword $kw -RegistryValue 1 -NoRestart; $c += $kw }
+            }
+            # Device Manager's "Allow the computer to turn off this device to save power" off: PnPCapabilities 0x18
+            $key = Get-ChildItem $class -ErrorAction SilentlyContinue |
+                Where-Object { (Get-ItemProperty $_.PSPath -Name NetCfgInstanceId -ErrorAction SilentlyContinue).NetCfgInstanceId -eq $n.InterfaceGuid } |
+                Select-Object -First 1
+            if ($key -and (SetValue $key.PSPath 'PnPCapabilities' 24)) { $c += 'NIC always powered' }
+            # "Allow this device to wake the computer"
+            $armed = powercfg /devicequery wake_armed
+            if ($armed -notcontains $n.InterfaceDescription) { powercfg /deviceenablewake "$($n.InterfaceDescription)"; $c += 'wake armed' }
+            if ($c.Count -gt $before) { $c[-1] += " ($($n.Name), MAC $($n.MacAddress))" }
+        }
+        if ($c) { ($c -join ', ') + '; reboot to apply. Wake from shutdown also needs the BIOS wake-on-PCIe/LAN option' }
+    }
+}
+
+# ---- Apollo (Moonlight host) ---------------------------------------------------------------------
+$ap = $Apollo.ToLower().Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
+$apolloConf = Join-Path $env:ProgramFiles 'Apollo\config\sunshine.conf'
+if ($ap) {
+    Step 'Apollo' {
+        if (-not (Test-Path $apolloConf)) { return 'not installed' }
+        $want = [ordered]@{
+            'upnp' = 'disabled'  # no router port mappings: remote clients come in over Tailscale
+            'headless_mode' = $(if ($ap -contains 'headless') { 'enabled' } else { 'disabled' })
+            'isolated_virtual_display_option' = $(if ($ap -contains 'isolated') { 'enabled' } else { 'disabled' })
+        }
+        $lines = [Collections.Generic.List[string]]([IO.File]::ReadAllLines($apolloConf))
+        $c = @()
+        foreach ($k in $want.Keys) {
+            $i = -1
+            for ($j = 0; $j -lt $lines.Count; $j++) { if ($lines[$j] -match "^\s*$k\s*=") { $i = $j } }
+            $line = "$k = $($want[$k])"
+            if ($i -ge 0 -and $lines[$i].Trim() -eq $line) { continue }
+            if ($i -ge 0) { $lines[$i] = $line } else { $lines.Add($line) }
+            $c += $line
+        }
+        if (-not $c) { return }
+        [IO.File]::WriteAllLines($apolloConf, $lines, (New-Object Text.UTF8Encoding $false))
+        Restart-Service ApolloService
+        ($c -join ', ') + '; restarted'
+    }
 }
 
 # ---- taskbar ----------------------------------------------------------------------------------
@@ -198,10 +296,9 @@ foreach ($id in $StoreApps.Split(' ', [StringSplitOptions]::RemoveEmptyEntries))
     Step "Store $id" {
         $winget = Get-Command winget -ErrorAction SilentlyContinue
         if (-not $winget) { return 'FAILED: winget not available yet; install it from the Store later' }
-        & winget list --id $id --source msstore --accept-source-agreements *> $null
-        if ($LASTEXITCODE -eq 0) { return }
         & winget install --id $id --source msstore --silent --accept-package-agreements --accept-source-agreements --disable-interactivity *> $null
-        if ($LASTEXITCODE -eq 0) { 'installed' } else { "FAILED: winget exit $LASTEXITCODE" }
+        if ($LASTEXITCODE -eq 0) { 'installed' }
+        elseif ($LASTEXITCODE -ne -1978335189) { "FAILED: winget exit $LASTEXITCODE" }  # 0x8A15002B: already installed
     }
 }
 
