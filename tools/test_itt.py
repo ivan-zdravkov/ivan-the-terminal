@@ -20,6 +20,8 @@ def load(path, name):
 
 itt = load(ROOT / "bin/itt", "itt")
 run_tests = load(ROOT / "tools/run_tests.py", "run_tests")
+toolchain = load(ROOT / "tools/toolchain.py", "toolchain")
+bootstrap = load(ROOT / "bin/bootstrap.py", "bootstrap")
 
 
 class EntryPoint(unittest.TestCase):
@@ -78,6 +80,43 @@ class Hooks(unittest.TestCase):
                            input=f"refs/heads/x {head} refs/heads/main {'0' * 40}\n", capture_output=True, text=True)
         self.assertNotEqual(p.returncode, 0)
         self.assertIn("main only changes through PRs", p.stderr)
+
+
+class Toolchain(unittest.TestCase):
+    def test_every_row_is_complete(self):
+        rows = toolchain.read()
+        self.assertIn("python3", [r["cmd"] for r in rows])
+        for r in rows:
+            self.assertIn(r["tier"], ("core", "extra"), r["cmd"])
+            self.assertTrue(r["purpose"] and (r["brew"] or r["winget"]), r["cmd"])
+            if r["winget"]:
+                self.assertRegex(r["winget"], r"^[\w-]+(\.[\w-]+)+$")
+
+    def test_dash_means_unmanaged(self):
+        f = Path(tempfile.mkdtemp()) / "toolchain.txt"
+        f.write_text("# header\nx  -  Some.Id  extra  %A%\\b  does  two things\n", encoding="utf-8")
+        (row,) = toolchain.read(f)
+        self.assertEqual(row, {"cmd": "x", "brew": None, "winget": "Some.Id", "tier": "extra",
+                               "win_dir": "%A%\\b", "purpose": "does  two things"})
+        self.assertIsNone(toolchain.package(row, windows=False))
+        self.assertEqual(toolchain.package(row, windows=True), "Some.Id")
+
+
+class Link(unittest.TestCase):
+    def test_link_backs_up_once_and_is_idempotent(self):
+        tmp = Path(tempfile.mkdtemp())
+        target, other, path = tmp / "target", tmp / "other", tmp / "deep" / "link"
+        target.mkdir(), other.mkdir()
+        path.mkdir(parents=True)
+        (path / "old.txt").write_text("x", encoding="utf-8")
+        bootstrap.link(target, path)
+        self.assertEqual(os.path.realpath(path), os.path.realpath(target))
+        self.assertEqual(len(list(path.parent.glob("link.pre-itt.*"))), 1)
+        bootstrap.link(target, path)  # unchanged
+        bootstrap.link(other, path)  # repointed, nothing backed up
+        self.assertEqual(os.path.realpath(path), os.path.realpath(other))
+        self.assertEqual(len(list(path.parent.glob("link.pre-itt.*"))), 1)
+        self.assertTrue(target.is_dir())  # the old target survives the repoint
 
 
 class Classify(unittest.TestCase):

@@ -84,9 +84,9 @@ class PushTest(unittest.TestCase):
         self.assertEqual(json.loads(unb64u(c))["aud"], "https://web.push.apple.com")
         self.assertEqual(json.loads(unb64u(h))["alg"], "ES256")
         pub, sig = Path(self.tmp.name, "pub.pem"), Path(self.tmp.name, "sig.der")
-        pub.write_bytes(subprocess.run(["openssl", "ec", "-in", str(self.push.key), "-pubout"], capture_output=True).stdout)
+        pub.write_bytes(subprocess.run([webapp.openssl(), "ec", "-in", str(self.push.key), "-pubout"], capture_output=True).stdout)
         sig.write_bytes(raw_to_der(unb64u(s)))
-        ok = subprocess.run(["openssl", "dgst", "-sha256", "-verify", str(pub), "-signature", str(sig)],
+        ok = subprocess.run([webapp.openssl(), "dgst", "-sha256", "-verify", str(pub), "-signature", str(sig)],
                             input=f"{h}.{c}".encode(), capture_output=True)
         self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
 

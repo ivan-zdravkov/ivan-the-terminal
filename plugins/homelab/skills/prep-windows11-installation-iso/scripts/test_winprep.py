@@ -101,6 +101,16 @@ class Installers(unittest.TestCase):
         self.assertEqual(winprep.silent_args(inst),
                          ("exe", '--lang=enUS --installpath="%PROGRAMFILES(X86)%\\Battle.net"'))
 
+    def test_preferred_type_and_fallback_location(self):
+        man = {"InstallLocationRequired": "true", "InstallerSwitches": {"InstallLocation": '-o"<INSTALLPATH>"'},
+               "Installers": [{"Architecture": "x64", "InstallerType": "msix", "InstallerUrl": "a"},
+                              {"Architecture": "x64", "InstallerType": "exe", "InstallerUrl": "b"}]}
+        self.assertEqual(winprep.pick_installer(man)["InstallerUrl"], "a")
+        inst = winprep.pick_installer(man, prefer="exe")
+        self.assertEqual(inst["InstallerUrl"], "b")
+        self.assertEqual(winprep.silent_args(inst, r"%LOCALAPPDATA%\T"), ("exe", r'-o"%LOCALAPPDATA%\T"'))
+        self.assertEqual(winprep.pick_installer(man, prefer="wix")["InstallerUrl"], "a")  # not offered: ignored
+
     def test_custom_switches_not_duplicated(self):
         inst = winprep.pick_installer(winprep.yaml_load(EA))
         self.assertEqual(winprep.silent_args(inst), ("burn", "/passive /norestart"))
@@ -165,6 +175,27 @@ class Scripts(unittest.TestCase):
         self.assertEqual(ps.count("if (-not (Signed "), 4)  # every installer but the MSIX
         self.assertEqual(ps.count("{"), ps.count("}"))
 
+    def test_toolchain_kinds(self):
+        sha = "ab" * 32
+        items = [("toolchain:gl", {"file": "gl.zip", "type": "zip", "args": "", "sha256": sha, "nested": ["gl.exe"]}),
+                 ("toolchain:age", {"file": "age.zip", "type": "zip", "args": "", "sha256": sha,
+                                    "nested": ["age/age.exe", "age/age-keygen.exe"]}),
+                 ("toolchain:jq", {"file": "jq.exe", "type": "portable", "args": "", "sha256": sha, "alias": "jq"}),
+                 ("toolchain:7z", {"file": "7z.exe", "type": "exe", "args": "/S", "sha256": sha,
+                                   "win_dir": r"%ProgramFiles%\7-Zip"}),
+                 ("toolchain:py", {"file": "py.msix", "type": "msix", "args": "", "sha256": sha, "post": "& py.exe x"})]
+        with mock.patch.object(winprep, "app_spec", lambda n: {"label": n.split(":")[1]}):
+            ps = winprep.install_script(items)
+        self.assertEqual(ps.count("(Hashed "), 4)  # zip, portable and the unsigned exe; not the MSIX
+        self.assertNotIn("Signed '", ps)
+        self.assertIn("AddPath (Join-Path $tools 'toolchain-gl')", ps)
+        self.assertIn("AddPath (Join-Path (Join-Path $tools 'toolchain-age') 'age')", ps)
+        self.assertEqual(ps.count("toolchain-age') 'age')"), 1)  # one PATH entry per directory
+        self.assertIn(r"(Join-Path $tools 'bin\jq.exe')", ps)
+        self.assertIn(r"AddPath '%ProgramFiles%\7-Zip'", ps)
+        self.assertIn("& py.exe x; $report += 'py: setup exit code ' + $LASTEXITCODE", ps)
+        self.assertEqual(ps.count("{"), ps.count("}"))
+
     def test_quotes_escaped(self):
         self.assertEqual(winprep.ps_quote("it's"), "'it''s'")
 
@@ -217,6 +248,14 @@ class Config(unittest.TestCase):
         with self.assertRaises(SystemExit):
             winprep.app_names(dict(winprep.DEFAULTS, APPS="git nope"))
         self.assertEqual(winprep.app_names(dict(winprep.DEFAULTS, APPS="git winget:Some.App")), ["git", "winget:Some.App"])
+
+    def test_toolchain_group(self):
+        names = winprep.app_names(dict(winprep.DEFAULTS, APPS="git toolchain winget:jqlang.jq"))
+        self.assertEqual(names[0], "git")
+        self.assertNotIn("toolchain:git", names)  # same package as the catalog's git
+        self.assertNotIn("winget:jqlang.jq", names)  # same package as toolchain:jq
+        self.assertIn("toolchain:python3", names)
+        self.assertEqual(winprep.app_spec("toolchain:pwsh")["prefer"], "wix")
 
 
 if __name__ == "__main__":

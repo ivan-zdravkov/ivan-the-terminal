@@ -15,8 +15,10 @@ The password and product key are only substituted locally; the generator site ne
 import argparse
 import base64
 import hashlib
+import importlib.util
 import json
 import os
+import posixpath
 import re
 import shlex
 import shutil
@@ -37,6 +39,7 @@ UA = "ivan-the-terminal/prep-windows11-installation-iso (+https://github.com/iva
 GENERATOR = "https://schneegans.de/windows/unattend-generator/download/"
 WINGET = "microsoft/winget-pkgs"
 PW_PLACEHOLDER = "XPLACEHOLDERX"
+BS = "\\"  # a Windows path separator inside f-strings
 # Microsoft's published generic install keys: they pick the edition but never activate.
 GENERIC_KEYS = {"pro": "VK7JG-NPHTM-C97JM-9MPGT-3V66T", "home": "YTMG3-N6DKC-DKB77-7M9GH-8HVX7"}
 DOWNLOAD_PAGE = "https://www.microsoft.com/software-download/windows11"
@@ -99,6 +102,12 @@ CATALOG = {
     "vscode": {"source": "winget", "id": "Microsoft.VisualStudioCode", "signer": "Microsoft Corporation", "label": "Visual Studio Code"},
     "git": {"source": "winget", "id": "Git.Git", "signer": None, "label": "Git for Windows"},  # versioned URL: hash only
 }
+# winget packages that need more than their installer: a preferred installer type, a step after installing.
+WINGET_EXTRAS = {
+    "Microsoft.PowerShell": {"prefer": "wix"},  # the machine-wide MSI, not the msixbundle
+    "Python.PythonInstallManager": {  # the manager alone has no Python: add the default runtime + its PATH entry
+        "post": "& (Join-Path $env:LOCALAPPDATA 'Microsoft\\WindowsApps\\py.exe') install --configure -y"},
+}
 SILENT_DEFAULTS = {"inno": "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART", "nullsoft": "/S",
                    "burn": "/quiet /norestart", "msi": "/quiet /norestart", "wix": "/quiet /norestart"}
 
@@ -134,18 +143,44 @@ def load_conf(path=CONF):
     return conf
 
 
+def toolchain_rows():
+    """toolchain.txt rows Windows gets from winget (APPS="toolchain"): ivan-the-terminal's tools, core and extra."""
+    module = Path(__file__).resolve().parents[5] / "tools" / "toolchain.py"
+    if not module.is_file():
+        die("APPS has 'toolchain', which needs an ivan-the-terminal checkout (tools/toolchain.py)")
+    spec = importlib.util.spec_from_file_location("toolchain", module)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return [r for r in mod.read() if r["winget"]]
+
+
 def app_names(conf):
-    names = conf["APPS"].split()
+    names = []
+    for n in conf["APPS"].split():
+        if n == "toolchain":
+            names += [f"toolchain:{r['cmd']}" for r in toolchain_rows()]
+        elif n in CATALOG or n.startswith("winget:"):
+            names.append(n)
+        else:
+            die(f"unknown app '{n}' in APPS (known: {' '.join(CATALOG)}, toolchain, or winget:<Package.Id>)")
+    seen, unique = set(), []  # one install per package: e.g. "git" and the toolchain's Git.Git
     for n in names:
-        if n not in CATALOG and not n.startswith("winget:"):
-            die(f"unknown app '{n}' in APPS (known: {' '.join(CATALOG)}, or winget:<Package.Id>)")
-    return names
+        key = app_spec(n).get("id") or n
+        if key not in seen:
+            seen.add(key)
+            unique.append(n)
+    return unique
 
 
 def app_spec(name):
     if name.startswith("winget:"):
         pid = name.split(":", 1)[1]
-        return {"source": "winget", "id": pid, "signer": None, "label": pid}
+        return {"source": "winget", "id": pid, "signer": None, "label": pid, **WINGET_EXTRAS.get(pid, {})}
+    if name.startswith("toolchain:"):
+        cmd = name.split(":", 1)[1]
+        row = next((r for r in toolchain_rows() if r["cmd"] == cmd), None) or die(f"no '{cmd}' in toolchain.txt")
+        return {"source": "winget", "id": row["winget"], "signer": None, "label": f"{cmd} ({row['winget']})",
+                "cmd": cmd, "win_dir": row["win_dir"], **WINGET_EXTRAS.get(row["winget"], {})}
     return CATALOG[name]
 
 
@@ -258,8 +293,9 @@ def winget_manifest(pid):
     return version, yaml_load(text.decode("utf-8"))
 
 
-def pick_installer(manifest, arch="x64"):
-    """Machine scope and our arch first, then neutral/x86; top-level fields are the defaults."""
+def pick_installer(manifest, arch="x64", prefer=None):
+    """PREFER's installer type when offered, then machine scope and our arch, then neutral/x86; top-level fields
+    are the defaults."""
     shared = {k: v for k, v in manifest.items() if k != "Installers"}
     cands = []
     for inst in manifest.get("Installers") or []:
@@ -272,10 +308,13 @@ def pick_installer(manifest, arch="x64"):
     cands = [c for c in cands if c.get("Architecture") in rank_arch]
     if not cands:
         raise LookupError(f"no {arch}/neutral/x86 installer")
+    if prefer and any((c.get("InstallerType") or "").lower() == prefer for c in cands):
+        cands = [c for c in cands if (c.get("InstallerType") or "").lower() == prefer]
     return min(cands, key=lambda c: (rank_arch[c.get("Architecture")], 0 if c.get("Scope", "machine") == "machine" else 1))
 
 
-def silent_args(inst):
+def silent_args(inst, location=None):
+    """(type, switches); LOCATION fills <INSTALLPATH> when the installer needs one and the manifest has no default."""
     kind = (inst.get("InstallerType") or "exe").lower()
     sw = inst.get("InstallerSwitches") or {}
     args = sw.get("Silent") or SILENT_DEFAULTS.get(kind, "")
@@ -283,7 +322,7 @@ def silent_args(inst):
         if word not in args.split():
             args = f"{args} {word}".strip()
     if inst.get("InstallLocationRequired") in (True, "true") and sw.get("InstallLocation"):
-        loc = (inst.get("InstallationMetadata") or {}).get("DefaultInstallLocation")
+        loc = (inst.get("InstallationMetadata") or {}).get("DefaultInstallLocation") or location
         if loc:
             args = f"{args} {sw['InstallLocation'].replace('<INSTALLPATH>', loc)}".strip()
     return kind, args
@@ -333,12 +372,17 @@ def resolve(name):
     src = spec["source"]
     if src == "winget":
         version, man = winget_manifest(spec["id"])
-        inst = pick_installer(man)
-        kind, args = silent_args(inst)
+        inst = pick_installer(man, prefer=spec.get("prefer"))
+        kind, args = silent_args(inst, spec.get("win_dir"))
+        if kind == "zip" and (inst.get("NestedInstallerType") or "").lower() != "portable":
+            raise LookupError("only zips of portable programs are supported")
         url = inst["InstallerUrl"]
-        ext = {"msi": ".msi", "wix": ".msi", "msix": ".msix"}.get(kind, ".exe")
+        ext = {"msi": ".msi", "wix": ".msi", "msix": ".msix", "zip": ".zip"}.get(kind, ".exe")
+        nested = [f["RelativeFilePath"] for f in inst.get("NestedInstallerFiles") or []]
+        alias = spec.get("cmd") or ((inst.get("Commands") or []) + [spec["id"].split(".")[-1].lower()])[0]
         return {"version": version, "url": url, "sha256": inst["InstallerSha256"].lower(), "type": kind,
-                "args": args, "signer": spec.get("signer"), "file": f"{name.replace(':', '-')}-{version}{ext}"}
+                "args": args, "signer": spec.get("signer"), "file": f"{name.replace(':', '-')}-{version}{ext}",
+                "nested": nested, "alias": alias, "win_dir": spec.get("win_dir"), "post": spec.get("post")}
     if src == "github":
         rel = http(f"https://api.github.com/repos/{spec['repo']}/releases/latest", as_json=True)
         asset = next(a for a in rel["assets"] if a["name"] == spec["asset"])
@@ -393,6 +437,13 @@ def install_script(items):
            "$dir = $PSScriptRoot",
            "Start-Transcript -Path (Join-Path $dir 'install-apps.log') -Append | Out-Null",
            "$report = @()",
+           "$tools = Join-Path $env:LOCALAPPDATA 'Programs\\ivan-the-terminal'  # zip and portable tools",
+           "function AddPath($d) {",
+           "  $d = [Environment]::ExpandEnvironmentVariables($d)",
+           "  $p = [Environment]::GetEnvironmentVariable('Path', 'User')",
+           "  if (($p -split ';') -notcontains $d) { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';' + $d).TrimStart(';'), 'User') }",
+           "}",
+           "function Hashed($file, $sha) { return (Get-FileHash -Algorithm SHA256 (Join-Path $dir $file)).Hash -eq $sha }",
            "function Signed($file, $signer) {",
            "  $s = Get-AuthenticodeSignature -FilePath (Join-Path $dir $file)",
            "  return $s.Status -eq 'Valid' -and (-not $signer -or $s.SignerCertificate.Subject -like \"*$signer*\")",
@@ -410,10 +461,25 @@ def install_script(items):
         label, f = ps_quote(text), ps_quote(info["file"])
         path = f"(Join-Path $dir {f})"
         kind = info["type"]
-        if kind != "msix":  # Add-AppxPackage verifies MSIX signatures itself
+        if kind in ("zip", "portable") or (kind != "msix" and info.get("sha256") and not info.get("signer")):
+            # no publisher to check (often unsigned, e.g. 7-Zip): the winget SHA-256 is checked again on the target
+            sha = ps_quote(info["sha256"].upper())
+            out.append(f"if (-not (Hashed {f} {sha})) {{ $report += {ps_quote(text + ': SKIPPED, hash mismatch')} }} else {{")
+        elif kind != "msix":  # Add-AppxPackage verifies MSIX signatures itself
             signer = ps_quote(info.get("signer") or "")
             out.append(f"if (-not (Signed {f} {signer})) {{ $report += {ps_quote(text + ': SKIPPED, signature not valid')} }} else {{")
-        if kind in ("msi", "wix"):
+        if kind == "zip":
+            dest = f"(Join-Path $tools {ps_quote(name.replace(':', '-'))})"
+            out.append(f"Expand-Archive -Path {path} -DestinationPath {dest} -Force")
+            for d in sorted({posixpath.dirname(n) for n in info.get("nested") or []}):
+                out.append(f"AddPath {dest}" if not d else f"AddPath (Join-Path {dest} {ps_quote(d.replace('/', BS))})")
+            out.append(f"$report += {ps_quote(text + ': installed')}")
+        elif kind == "portable":
+            exe = ps_quote(f"bin{BS}{info['alias']}.exe")
+            out.append("New-Item -ItemType Directory -Force (Join-Path $tools 'bin') | Out-Null")
+            out.append(f"Copy-Item {path} (Join-Path $tools {exe}) -Force; AddPath (Join-Path $tools 'bin')")
+            out.append(f"$report += {ps_quote(text + ': installed')}")
+        elif kind in ("msi", "wix"):
             args = ps_quote(f'/i "{{0}}" {info["args"]}'.strip())
             out.append(f"$report += Run {label} 'msiexec.exe' ({args} -f {path})")
         elif kind == "msix":
@@ -426,6 +492,10 @@ def install_script(items):
             if "%" in info["args"]:  # e.g. %PROGRAMFILES(X86)% in an install path; Start-Process won't expand it
                 args = f"([Environment]::ExpandEnvironmentVariables({args}))"
             out.append(f"$report += Run {label} {path} {args}")
+        if info.get("win_dir"):
+            out.append(f"AddPath {ps_quote(info['win_dir'])}")
+        if info.get("post"):
+            out.append(f"{info['post']}; $report += {ps_quote(text + ': setup exit code ')} + $LASTEXITCODE")
         if kind != "msix":
             out.append("}")
     out += ["$keys = Join-Path $dir 'restore-keys.ps1'",

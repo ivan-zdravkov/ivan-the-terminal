@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Health check for ivan-the-terminal. Prints problems only (-v: everything) and a summary line.
-  --update   upgrade outdated brew-managed tools first
-Stdlib only; Linux and Windows (systemd and shell-link checks are Linux-only).
+  --update   upgrade outdated brew (Linux) or winget (Windows) tools first
+Stdlib only; Linux and Windows (systemd checks are Linux-only).
 """
 import json
 import os
@@ -16,6 +16,9 @@ PRIVATE_DIR = Path(os.environ.get("ITT_PRIVATE_DIR") or ITT_HOME.parent / "ivan-
 CFG = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
 HOME = Path.home()
 LINUX = sys.platform.startswith("linux")
+WINDOWS = os.name == "nt"
+sys.path.insert(0, str(ITT_HOME / "tools"))
+import toolchain  # noqa: E402
 out = []
 
 
@@ -38,23 +41,40 @@ def same(a, b):
         return False
 
 
-def toolchain(update):
-    brew, prefix, outdated = shutil.which("brew"), "", set()
-    if brew:
-        os.environ["HOMEBREW_NO_AUTO_UPDATE"] = "1"
-        if update:
-            sh(brew, "update", "-q")
-        outdated = {re.sub(r"@.*", "", line) for line in sh(brew, "outdated", "--quiet").stdout.split()}
-        prefix = sh(brew, "--prefix").stdout.strip()
-    for line in (ITT_HOME / "toolchain.txt").read_text(encoding="utf-8").splitlines():
-        if not line.strip() or line.startswith("#"):
-            continue
-        cmd, formula, purpose = (line.split(None, 2) + ["", ""])[:3]
+def outdated_packages(update):
+    """Packages with an update: brew formula names (Linux) or winget ids (Windows); empty when unmanaged."""
+    if WINDOWS:
+        if not shutil.which("winget"):
+            return set()
+        listing = sh("winget", "upgrade", "--accept-source-agreements", "--disable-interactivity").stdout
+        return {w for line in listing.splitlines() for w in line.split()}
+    if not shutil.which("brew"):
+        return set()
+    os.environ["HOMEBREW_NO_AUTO_UPDATE"] = "1"
+    if update:
+        sh("brew", "update", "-q")
+    return {re.sub(r"@.*", "", line) for line in sh("brew", "outdated", "--quiet").stdout.split()}
+
+
+def upgrade(package):
+    if WINDOWS:
+        return sh("winget", "upgrade", "--id", package, "-e", "--silent", "--accept-package-agreements",
+                  "--accept-source-agreements", "--disable-interactivity").returncode == 0
+    return sh("brew", "upgrade", "-q", package).returncode == 0
+
+
+def toolchain_checks(update):
+    outdated = outdated_packages(update)
+    for row in toolchain.read():
+        cmd, package, core = row["cmd"], toolchain.package(row, WINDOWS), row["tier"] == "core"
         path = shutil.which(cmd)
         if not path:
-            r("fail", f"tool:{cmd}", f"missing ({purpose}): itt bootstrap")
-        elif brew and prefix and path.startswith(prefix + "/") and re.sub(r"@.*", "", formula) in outdated:
-            if update and sh(brew, "upgrade", "-q", formula).returncode == 0:
+            if not package and core:
+                continue  # not needed on this OS
+            level, hint = ("fail" if core else "warn"), ("itt bootstrap" if package else "install it yourself")
+            r(level, f"tool:{cmd}", f"missing ({row['purpose']}): {hint}")
+        elif package and re.sub(r"@.*", "", package) in outdated:
+            if update and upgrade(package):
                 r("ok", f"tool:{cmd}", "upgraded")
             else:
                 r("warn", f"tool:{cmd}", "update available: itt doctor --update")
@@ -62,7 +82,8 @@ def toolchain(update):
             version = sh(path, "--version")
             r("ok", f"tool:{cmd}", ((version.stdout or version.stderr).splitlines() or [""])[0])
     gh = shutil.which("gh")
-    if gh and not (brew and prefix and gh.startswith(prefix + "/")):  # not brew-managed: compare with latest
+    brew_prefix = sh("brew", "--prefix").stdout.strip() if shutil.which("brew") else ""
+    if gh and not WINDOWS and not (brew_prefix and gh.startswith(brew_prefix + "/")):  # unmanaged: compare with latest
         have = (sh(gh, "--version").stdout.split() + ["", "", ""])[2]
         latest = sh(gh, "api", "repos/cli/cli/releases/latest", "-q", ".tag_name").stdout.strip().lstrip("v")
         if latest and have != latest:
@@ -77,7 +98,9 @@ def auth():
             r("warn", "ssh-passphrase", f"{key} has no passphrase: ssh-keygen -p -f {key}")
         else:
             r("ok", "ssh-passphrase")
-    ssh = sh("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-T", "git@github.com")  # exits 1 on success
+    # the ssh git uses: on Windows that's OpenSSH with the agent (core.sshCommand), not Git Bash's ssh
+    ssh_exe = sh("git", "config", "--global", "core.sshCommand").stdout.strip() or "ssh"
+    ssh = sh(ssh_exe, "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-T", "git@github.com")  # exits 1 on success
     if "successfully authenticated" in ssh.stdout + ssh.stderr:
         r("ok", "github-ssh")
     else:
@@ -110,13 +133,24 @@ def guards():
 
 
 def links():
-    if LINUX:
-        if same(HOME / ".bashrc.d/claude-home.sh", ITT_HOME / "shell/claude-home.bash"):
-            r("ok", "claude-home")
-        else:
-            r("warn", "claude-home", "interactive claude won't start in ivan-the-terminal: itt bootstrap")
+    if WINDOWS:
+        profile = sh("pwsh", "-NoProfile", "-Command", "$PROFILE.CurrentUserCurrentHost").stdout.strip()
+        try:
+            hooked = bool(profile) and "claude-home.ps1" in Path(profile).read_text(encoding="utf-8-sig")
+        except OSError:
+            hooked = False
+    else:
+        hooked = same(HOME / ".bashrc.d/claude-home.sh", ITT_HOME / "shell/claude-home.bash")
+    r(*(("ok", "claude-home") if hooked else ("warn", "claude-home", "interactive claude won't start in ivan-the-terminal: itt bootstrap")))
     itt = shutil.which("itt")
-    r(*(("ok", "itt-path") if itt and same(itt, ITT_HOME / "bin/itt") else ("warn", "itt-path", "itt not on PATH: itt bootstrap")))
+    if WINDOWS:  # itt.cmd shim
+        try:
+            ok = bool(itt) and str(ITT_HOME / "bin" / "itt") in Path(itt).read_text(encoding="utf-8")
+        except OSError:
+            ok = False
+    else:
+        ok = bool(itt) and same(itt, ITT_HOME / "bin/itt")
+    r(*(("ok", "itt-path") if ok else ("warn", "itt-path", "itt not on PATH: itt bootstrap")))
     for s in sorted(ITT_HOME.glob("plugins/*/skills/*/SKILL.md")):
         if not same(HOME / ".claude/skills" / s.parent.name, s.parent):
             r("warn", f"skill:{s.parent.name}", "not linked: itt bootstrap")
@@ -144,9 +178,13 @@ def github():  # skipped offline
     slug = re.sub(r"\.git$", "", re.sub(r"^(git@github\.com:|https://github\.com/)", "", url))
     if not slug:
         return
-    checks = sh("gh", "api", f"repos/{slug}/branches/main/protection",
-                "-q", '.required_status_checks.contexts | sort | join(",")').stdout.strip()
-    if checks == "gitleaks,leakguard,tests,tests-windows":
+    prot = sh("gh", "api", f"repos/{slug}/branches/main/protection",
+              "-q", '.required_status_checks.contexts | sort | join(",")')
+    checks = prot.stdout.strip()
+    if prot.returncode and "not protected" not in prot.stdout + prot.stderr:
+        r("warn", "branch-protection", "couldn't query GitHub (gh missing, logged out or offline)")
+        return
+    if checks == "gitleaks,leakguard,tests-linux,tests-windows":
         r("ok", "branch-protection")
     elif checks:
         r("warn", "branch-protection", f"required checks are '{checks}'")
@@ -158,17 +196,20 @@ def github():  # skipped offline
 
 def overlay():
     doctor = PRIVATE_DIR / "bin/doctor"
-    if not (doctor.is_file() and os.access(doctor, os.X_OK)) or os.name != "posix":
-        r("warn", "private-overlay", f"no runnable doctor at {doctor} (generic mode)")
+    if not doctor.is_file():
+        r("warn", "private-overlay", f"no doctor at {doctor} (generic mode)")
         return
-    for line in sh(str(doctor)).stdout.splitlines():
+    res = sh(sys.executable, "-I", str(doctor))
+    if res.returncode:
+        r("fail", "private-overlay", f"{doctor} failed: {(res.stderr.strip().splitlines() or ['?'])[-1]}")
+    for line in res.stdout.splitlines():
         level, check, detail = (line.split("\t") + ["", ""])[:3]
         r(level, f"private:{check}", detail)
 
 
 def main(args):
     verbose, update = "-v" in args, "--update" in args
-    for section in (lambda: toolchain(update), auth, guards, links, scheduler, github, overlay):
+    for section in (lambda: toolchain_checks(update), auth, guards, links, scheduler, github, overlay):
         section()
     counts = {"ok": 0, "warn": 0, "fail": 0}
     for level, check, detail in out:
