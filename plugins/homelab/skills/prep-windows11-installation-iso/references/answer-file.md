@@ -49,6 +49,8 @@ Runs at the end of `install-apps.ps1`, when every app's shortcuts and Run entrie
 | Autostart | Run entries matching `AUTOSTART_OFF` are marked Disabled, as Task Manager does. Their `StartupApproved` flag survives app updates that re-add the entry |
 | Debloat | Edge uninstalled and blocked from reinstalling (EEA only; the WebView2 runtime stays), Windows Fax and Scan (printing untouched), Phone Link's CrossDevice host |
 | Gaming | Hardware-accelerated GPU scheduling, Game Mode on, Game DVR background recording off, optimizations for windowed games, .NET Framework 3.5 |
+| Power (`POWER`) | `always-on`: never sleep, hibernate or spin disks down, and hibernation is turned off. `screen:N` turns the display off after N minutes. `lock:N` sets the machine inactivity limit, so the session locks after N idle minutes. `wol`: magic packet and wake-from-shutdown on in the wired NIC's driver, the NIC kept powered, and wake armed. Wake from shutdown also needs the BIOS option |
+| Apollo (`APOLLO`) | `upnp` off (remote clients use Tailscale, no router mappings). `headless`: every session gets a virtual display at the client's resolution and fps. `isolated`: during a stream, that display is the only one, so games can't open on the physical monitor. Apollo counts Tailscale addresses (the shared CGNAT range) as LAN |
 | Logon task | `ivan-the-terminal desktop` runs elevated at logon and every 15 minutes, with no window (`conhost --headless`). It promotes new tray icons and disables launchers that re-registered themselves |
 
 Not touched on purpose: Defender, UAC, Windows Update, the print spooler, SysMain, search indexing and the power plan. Balanced is what AMD and Intel recommend for current CPUs.

@@ -23,3 +23,5 @@ TASKBAR_PINS=""                     # comma-separated Start menu shortcut names,
 AUTOSTART_OFF="Steam Battle.net EADM EADesktop GalaxyClient GogGalaxy EpicGamesLauncher Ubisoft* Uplay*"   # Run entries disabled
 DEBLOAT="Edge FaxScan CrossDevice"  # Edge (EEA only; WebView2 stays), Windows Fax and Scan, Phone Link's host
 STORE_APPS=""                       # Microsoft Store ids, e.g. "9WZDNCRFJ3PV" (Windows Scan)
+POWER=""                            # always-on (never sleep/hibernate), screen:<min>, lock:<min>, wol; e.g. "always-on screen:15 lock:30 wol"
+APOLLO=""                           # with apollo in APPS: headless (virtual display at the client's resolution + fps), isolated

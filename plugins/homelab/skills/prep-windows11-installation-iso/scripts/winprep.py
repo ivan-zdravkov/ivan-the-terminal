@@ -73,6 +73,8 @@ DEFAULTS = {
     "AUTOSTART_OFF": "Steam Battle.net EADM EADesktop GalaxyClient GogGalaxy EpicGamesLauncher Ubisoft* Uplay*",
     "DEBLOAT": "Edge FaxScan CrossDevice",
     "STORE_APPS": "",
+    "POWER": "",
+    "APOLLO": "",
 }
 
 # The debloat profile: every option of the generator we set (see references/answer-file.md).
@@ -113,6 +115,9 @@ CATALOG = {
     "qbittorrent": {"source": "winget", "id": "qBittorrent.qBittorrent", "signer": None, "label": "qBittorrent"},  # unsigned
     "stremio": {"source": "winget", "id": "Stremio.Stremio", "signer": "Smart Code", "label": "Stremio"},
     "potplayer": {"source": "winget", "id": "Daum.PotPlayer", "signer": "Kakao Corp", "label": "PotPlayer"},  # fixed URL
+    "tailscale": {"source": "winget", "id": "Tailscale.Tailscale", "signer": "Tailscale Inc", "label": "Tailscale"},
+    # Moonlight host (Sunshine fork) with its own virtual display driver; unsigned: hash only
+    "apollo": {"source": "winget", "id": "ClassicOldSong.Apollo", "signer": None, "label": "Apollo"},
 }
 # APPS="runtimes": what PC games expect to find (Visual C++ 2005-2022, legacy DirectX 9-11 DLLs, XNA, .NET).
 # .NET Framework 3.5 is a Windows feature: tune-windows.ps1 enables it.
@@ -453,7 +458,7 @@ def ps_quote(s):
 def tune_call(conf, script, log=None):
     """PowerShell call of tune-windows.ps1 (SCRIPT: a PowerShell path expression) with the conf's settings."""
     args = [("Taskbar", "TASKBAR"), ("Pins", "TASKBAR_PINS"), ("AutostartOff", "AUTOSTART_OFF"),
-            ("Debloat", "DEBLOAT"), ("StoreApps", "STORE_APPS")]
+            ("Debloat", "DEBLOAT"), ("StoreApps", "STORE_APPS"), ("Power", "POWER"), ("Apollo", "APOLLO")]
     call = f"& {script}" + "".join(f" -{p} {ps_quote(conf[k])}" for p, k in args)
     return call + (f" -Log {ps_quote(log)}" if log else "")
 
@@ -776,6 +781,7 @@ def cmd_plan(conf, a):
     say(f"removed: {conf['REMOVE']}; after the apps: {conf['DEBLOAT'] or 'nothing'}")
     say(f"taskbar: {conf['TASKBAR'] or 'unchanged'}; pins: {conf['TASKBAR_PINS'] or 'unchanged'}; "
         f"autostart off: {conf['AUTOSTART_OFF'] or '-'}; Store apps: {conf['STORE_APPS'] or '-'}")
+    say(f"power: {conf['POWER'] or 'Windows defaults'}; Apollo: {conf['APOLLO'] or 'defaults'}")
     say(f"keys: {conf['KEYS_VOLUME'] + ':' + chr(92) + conf['KEYS_DIR'] if conf['KEYS_VOLUME'] else 'not restored'}"
         f"; git identity: {conf['GIT_NAME'] or '-'} <{conf['GIT_EMAIL'] or '-'}>")
     say(f"secrets in env: WIN11_PASSWORD {'set' if 'WIN11_PASSWORD' in os.environ else 'MISSING'}, "
