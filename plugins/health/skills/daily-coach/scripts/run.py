@@ -34,7 +34,7 @@ def load_webapp():
 
 
 def tool(name, *args):
-    return [sys.executable, "-I", str(TOOLS / name), *args]
+    return [sys.executable, "-I", "-X", "utf8", str(TOOLS / name), *args]  # UTF-8 pipes on Windows too
 
 
 def prompt_for(work):

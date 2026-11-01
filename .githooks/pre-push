@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Last local gate: pushing a branch to a public remote publishes it, so scan every outgoing commit."""
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -30,5 +31,7 @@ for line in sys.stdin:  # "<local ref> <local sha> <remote ref> <remote sha>" pe
         base = rsha
     if subprocess.run(leakguard("range", base, lsha)).returncode:
         sys.exit(1)
+if not shutil.which("gitleaks"):
+    sys.exit("pre-push: gitleaks is not installed (itt bootstrap); refusing to push unscanned")
 if subprocess.run(["gitleaks", "git", "--redact", "--no-banner", "--log-level", "warn", str(ROOT)]).returncode:
     sys.exit(1)
