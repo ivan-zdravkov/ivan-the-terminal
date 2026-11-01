@@ -1,0 +1,9 @@
+[Unit]
+Description=Restart the TV remote remapper after the TV boots (checks every 3 min; silent while the TV is off)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=3min
+
+[Install]
+WantedBy=timers.target

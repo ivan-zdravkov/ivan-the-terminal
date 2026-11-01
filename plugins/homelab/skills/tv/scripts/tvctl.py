@@ -4,7 +4,9 @@
   tvctl.py status [--json]                     apps (installed vs latest), autostart, always-on VPN
   tvctl.py update [APP...] [--dry-run]         install missing / update outdated apps from their official sources
               [--weekly] [--notify]            timer mode: at most once per WEEKLY_DAYS, skip apps in use, notify
-  tvctl.py setup                               autostart app on boot, always-on VPN, disabled stock apps (idempotent)
+  tvctl.py setup                               autostart app on boot, always-on VPN, disabled stock apps,
+                                               remote button remapper (idempotent)
+  tvctl.py bridge                              only (re)start the remapper's Expert Mode bridge (timer; quiet when TV is off)
   tvctl.py connect                             adb connect (TV_ADB, else mDNS discovery)
 
 Config: ~/.config/ivan-the-terminal/tv.conf (template: ../config.example). Stdlib only.
@@ -78,19 +80,33 @@ def tailscale(abis):
     return idx["APKsVersion"], url, http(url + ".sha256").split()[0]
 
 
+def keymapper(abis):
+    rel = http("https://api.github.com/repos/keymapperorg/KeyMapper/releases/latest", as_json=True)
+    for a in rel["assets"]:
+        m = re.fullmatch(r"keymapper-([\d.]+)-foss\.apk", a["name"])
+        if m:
+            return m.group(1), a["browser_download_url"], (a.get("digest") or "").removeprefix("sha256:") or None
+    raise LookupError(f"no Key Mapper FOSS asset in {rel['tag_name']}")
+
+
 APPS = {
     "stremio": ("com.stremio.one", stremio),
     "stremio-boot": ("com.stremio.tv.launcher", stremio_boot),
     "smarttube": ("org.smarttube.stable", smarttube),
     "tailscale": ("com.tailscale.ipn", tailscale),
+    "keymapper": ("io.github.sds100.keymapper", keymapper),
 }
 VPN_PKGS = {"tailscale": "com.tailscale.ipn"}
 BOOT_HELPERS = {"stremio": ("com.stremio.tv.launcher", "com.stremio.tv.launcher/.MainActivity")}
+KM = "io.github.sds100.keymapper"
+KM_A11Y = f"{KM}/.system.accessibility.MyAccessibilityService"
+KM_A11Y_FORMS = {KM_A11Y, KM_A11Y.replace("/.", f"/{KM}.")}  # Android stores either form
+KM_START = f"/storage/emulated/0/Android/data/{KM}/start.sh"  # written by the app when Expert Mode is set up
 
 
 def load_conf():
     conf = {"TV_ADB": "", "APPS": "stremio stremio-boot smarttube tailscale",
-            "AUTOSTART": "stremio", "ALWAYS_ON_VPN": "tailscale", "DISABLE": "", "WEEKLY_DAYS": "7"}
+            "AUTOSTART": "stremio", "ALWAYS_ON_VPN": "tailscale", "DISABLE": "", "REMAP": "", "WEEKLY_DAYS": "7"}
     if CONF.is_file():
         for line in CONF.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -107,8 +123,9 @@ class TV:
     def __init__(self, serial):
         self.serial = serial
 
-    def adb(self, *args, timeout=60):
-        return subprocess.run(["adb", "-s", self.serial, *args], capture_output=True, text=True, timeout=timeout)
+    def adb(self, *args, timeout=60, input=None):
+        return subprocess.run(["adb", "-s", self.serial, *args], capture_output=True, text=True, timeout=timeout,
+                              input=input)
 
     def sh(self, cmd):
         return self.adb("shell", cmd).stdout.strip()
@@ -236,6 +253,51 @@ def setup_checks(tv, conf, apply):
             yield "warn", f"disabled:{pkg}", "enabled again: run `itt run tv setup`"
 
 
+def start_bridge(tv):
+    """Run Key Mapper's start.sh with the installed APK's current paths (an app update moves them)."""
+    script = tv.sh(f"cat {KM_START} 2>/dev/null")
+    apk = tv.sh(f"pm path {KM}").removeprefix("package:")
+    if "--apk=" not in script or not apk:
+        return "start.sh missing: in Key Mapper, open Settings > Expert Mode and start it once"
+    lib = tv.sh(f"ls -d {shlex.quote(apk.rsplit('/', 1)[0])}/lib/* | head -1")
+    code = re.search(r"versionCode=(\d+)", tv.sh(f"dumpsys package {KM} | grep -m1 versionCode="))
+    script = re.sub(r'--apk="[^"]*"', f'--apk="{apk}"', script)
+    script = re.sub(r'--lib="[^"]*"', f'--lib="{lib}"', script)
+    if code:
+        script = re.sub(r'--version="\d+"', f'--version="{code.group(1)}"', script)
+    tv.adb("shell", "sh", "-s", input=script, timeout=60)
+    time.sleep(3)
+    return None
+
+
+def remap_checks(tv, conf, apply):
+    """Key Mapper: its accessibility service, and the Expert Mode bridge that grabs the remote's app buttons."""
+    if conf["REMAP"] != "keymapper":
+        return
+    if tv.version(KM) is None:
+        yield "warn", "remap", "keymapper not installed (add it to APPS, run update)"
+        return
+    services = tv.sh("settings get secure enabled_accessibility_services").replace("null", "")
+    if apply:
+        if not KM_A11Y_FORMS & set(services.split(":")):
+            services = ":".join(filter(None, [services, KM_A11Y]))
+            tv.sh(f"settings put secure enabled_accessibility_services {shlex.quote(services)}")
+            tv.sh("settings put secure accessibility_enabled 1")
+        tv.sh(f"appops set {KM} SYSTEM_ALERT_WINDOW allow; pm grant {KM} android.permission.WRITE_SECURE_SETTINGS; "
+              f"dumpsys deviceidle whitelist +{KM}")
+    if not KM_A11Y_FORMS & set(tv.sh("settings get secure enabled_accessibility_services").split(":")):
+        yield "fail", "remap:service", "Key Mapper accessibility service off: run `itt run tv setup`"
+    else:
+        yield "ok", "remap:service", "on"
+    problem = None
+    if apply and not tv.sh("pidof keymapper_sysbridge"):
+        problem = start_bridge(tv)
+    if tv.sh("pidof keymapper_sysbridge"):
+        yield "ok", "remap:bridge", "Expert Mode running"
+    else:
+        yield "warn", "remap:bridge", problem or "Expert Mode not running (app buttons do their stock thing): run `itt run tv setup`"
+
+
 def report(rows, as_json=False, verbose=False):
     if as_json:
         print(json.dumps([dict(zip(("level", "check", "detail"), r)) for r in rows], indent=1))
@@ -270,6 +332,8 @@ def main(argv):
 
     tv = connect(conf)
     if tv is None:
+        if cmd == "bridge":  # timer: the TV is simply off
+            return 0
         if weekly:  # TV off or in deep standby: the daily timer retries tomorrow; nag only when long overdue
             overdue = not stamp.exists() or time.time() - stamp.stat().st_mtime > 2 * float(conf["WEEKLY_DAYS"]) * 86400
             if overdue and "--notify" in flags:
@@ -306,6 +370,11 @@ def main(argv):
             stamp.touch()
     if cmd in ("status", "setup"):
         out += list(setup_checks(tv, conf, apply=cmd == "setup"))
+        out += list(remap_checks(tv, conf, apply=cmd == "setup"))
+    elif cmd == "bridge":
+        out += [r for r in remap_checks(tv, conf, apply=True) if r[1] == "remap:bridge"]
+        if all(lvl == "ok" for lvl, _, _ in out):
+            return 0
     elif cmd != "update":
         sys.exit(__doc__)
 

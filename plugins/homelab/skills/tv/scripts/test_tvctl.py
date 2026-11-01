@@ -41,6 +41,43 @@ class Sources(unittest.TestCase):
             self.assertEqual(tvctl.smarttube(["armeabi-v7a", "armeabi"]), ("32.68", "v7", "bb"))
             self.assertEqual(tvctl.smarttube(["x86"]), ("32.68", "u", "aa"))
 
+    def test_keymapper_foss_asset_and_digest(self):
+        rel = {"tag_name": "v4.6.2", "assets": [
+            {"name": "keymapper-4.6.2.apk", "browser_download_url": "play", "digest": "sha256:aa"},
+            {"name": "keymapper-4.6.2-foss.apk", "browser_download_url": "foss", "digest": "sha256:bb"},
+        ]}
+        with mock.patch.object(tvctl, "http", return_value=rel):
+            self.assertEqual(tvctl.keymapper(["armeabi-v7a"]), ("4.6.2", "foss", "bb"))
+
+
+class FakeTV:
+    def __init__(self, replies):
+        self.replies, self.ran = replies, None
+
+    def sh(self, cmd):
+        return next((v for k, v in self.replies.items() if cmd.startswith(k)), "")
+
+    def adb(self, *args, timeout=60, input=None):
+        self.ran = input
+
+
+class Bridge(unittest.TestCase):
+    START = 'echo hi\n$STARTER_PATH --apk="/data/app/~~old/km-old/base.apk" --lib="/data/app/~~old/km-old/lib/arm" ' \
+            '--package="io.github.sds100.keymapper" --version="288"\n'
+
+    def test_start_uses_current_install_paths(self):
+        tv = FakeTV({"cat ": self.START, "pm path": "package:/data/app/~~new/km-new/base.apk",
+                     "ls -d": "/data/app/~~new/km-new/lib/arm", "dumpsys package": "versionCode=301 minSdk=21"})
+        with mock.patch.object(tvctl.time, "sleep"):
+            self.assertIsNone(tvctl.start_bridge(tv))
+        self.assertIn('--apk="/data/app/~~new/km-new/base.apk" --lib="/data/app/~~new/km-new/lib/arm"', tv.ran)
+        self.assertIn('--version="301"', tv.ran)
+
+    def test_missing_start_script_is_reported(self):
+        tv = FakeTV({"pm path": "package:/data/app/x/base.apk"})
+        self.assertIn("start.sh missing", tvctl.start_bridge(tv))
+        self.assertIsNone(tv.ran)
+
 
 if __name__ == "__main__":
     unittest.main()
