@@ -1,6 +1,6 @@
 ---
 name: tv
-description: Manage the Android / Google TV over adb - install and update sideloaded apps from their official sources (Stremio, SmartTube ad-free YouTube, Tailscale), open Stremio on power-on, keep Tailscale always-on so DNS goes through the tailnet; weekly update timer. Use when Ivan asks about the TV, its apps, YouTube ads, Stremio, or the TV on Tailscale.
+description: Manage the Android / Google TV over adb - install and update sideloaded apps from official sources (Stremio, SmartTube ad-free YouTube, Tailscale, Key Mapper), open Stremio on power-on, Tailscale always-on for tailnet DNS, remote app buttons remapped; weekly updates. Use when Ivan asks about the TV, its apps or remote buttons, YouTube ads, Stremio, or the TV on Tailscale.
 ---
 
 # TV
@@ -11,10 +11,12 @@ Config: `~/.config/ivan-the-terminal/tv.conf` (template: `config.example`). The 
 - `itt run tv status` shows outdated or missing apps and settings drift (problems only; `-v` shows all).
 - `itt run tv update [app...]` installs missing apps and updates outdated ones (`--dry-run` to preview). Checksums are verified when the source publishes them (SmartTube, Tailscale).
 - `itt run tv setup` (idempotent) gives the boot helper its permissions, makes Tailscale the always-on VPN, and keeps the `DISABLE` stock apps disabled (stock YouTube, so links open in SmartTube; undo with `adb shell pm enable <pkg>`).
+- Remote app buttons (`REMAP=keymapper`): Key Mapper's key maps send them where Ivan wants (e.g. YouTube → SmartTube, Netflix/Disney+/Prime → Stremio). The firmware launches these buttons before accessibility services see them, so only Expert Mode works: a shell-user bridge that grabs the IR remote.
+  It dies on every reboot. `setup` starts it, and `tv-bridge.timer` (every 3 min, silent while the TV is off) restarts it from the PC. Recording and the key maps themselves are done in the app; see `references/apps.md`.
 - `itt run tv connect` connects adb. It falls back to mDNS when the TV's IP changed; then update `TV_ADB`.
 
 The weekly update runs from `tv-update.timer`: it fires daily, but works at most once per `WEEKLY_DAYS`, so it retries while the TV is off. It skips an app that is open on screen and notifies on problems. Its last result is in `~/.local/state/ivan-the-terminal/tv/last.txt`.
-Install it with `ln -sf $ITT/plugins/homelab/systemd/tv-update.{service,timer} ~/.config/systemd/user/ && systemctl --user enable --now tv-update.timer`, then add `tv-update.timer` to `WATCH_USER_UNITS` in homelab.conf.
+Install it with `ln -sf $ITT/plugins/homelab/systemd/tv-{update,bridge}.{service,timer} ~/.config/systemd/user/ && systemctl --user enable --now tv-update.timer tv-bridge.timer`, then add both timers to `WATCH_USER_UNITS` in homelab.conf.
 
 ## First-time setup (new TV)
 1. Turn on Developer options, then Network debugging, and accept the adb prompt on the TV. Reserve the TV's IP in the router.
@@ -26,5 +28,6 @@ Install it with `ln -sf $ITT/plugins/homelab/systemd/tv-update.{service,timer} ~
 - `adb` unreachable: the TV is in deep standby or off, Network debugging is off after a firmware update, or the adb key was revoked. Ask Ivan to wake the TV and accept the prompt.
 - Install fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: the signing key changed. Stop here. Never uninstall to force it; check the project's announcements first. SmartTube moved to `org.smarttube.stable` after its 2025 key leak.
 - Stremio doesn't open on power-on: the helper only fires on a cold boot. Run `setup` and check `autostart`. For wake from standby, Projectivy Launcher's startup-app option covers it; ask before replacing the launcher.
+- A remote app button opens its stock app or a Play Store page: the bridge isn't running (TV just booted and the PC is off, or Key Mapper was updated). Run `itt run tv setup`; `status` shows `remap:bridge`.
 - Ads in SmartTube: update it. Its ad blocking depends on keeping up with YouTube changes, and NextDNS cannot block YouTube ads.
 For sources, package names and why these apps, read `references/apps.md`.

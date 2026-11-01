@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep the TV remote remapper's Expert Mode bridge running (Key Mapper, over adb)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/itt run tv bridge
+Environment=PATH=%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+SuccessExitStatus=1
