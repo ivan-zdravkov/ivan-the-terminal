@@ -260,6 +260,27 @@ class Config(unittest.TestCase):
         self.assertEqual(names[0], "7zip")
         self.assertNotIn("toolchain:7z", names)  # same package as the catalog's 7zip
 
+    def test_runtimes_group(self):
+        names = winprep.app_names(dict(winprep.DEFAULTS, APPS="runtimes winget:Microsoft.XNARedist"))
+        self.assertEqual(len(names), len(winprep.RUNTIMES))
+        self.assertIn("winget:Microsoft.VCRedist.2005.x86", names)
+        self.assertEqual(winprep.app_spec("winget:Microsoft.DirectX")["prefer"], "exe")
+
+
+class Tune(unittest.TestCase):
+    def test_call_quotes_every_setting(self):
+        conf = dict(winprep.DEFAULTS, TASKBAR_PINS="File Explorer, Ivan's App", STORE_APPS="")
+        call = winprep.tune_call(conf, "(Join-Path $dir 'tune-windows.ps1')")
+        self.assertTrue(call.startswith("& (Join-Path $dir 'tune-windows.ps1') -Taskbar 'center autohide alltray'"))
+        self.assertIn("-Pins 'File Explorer, Ivan''s App'", call)
+        self.assertIn("-StoreApps ''", call)
+        self.assertNotIn("-Log", call)
+
+    def test_install_script_tunes_before_keys(self):
+        script = winprep.install_script([], tune="& 'tune.ps1'")
+        self.assertLess(script.index("& 'tune.ps1' | ForEach-Object"), script.index("restore-keys.ps1"))
+        self.assertNotIn("tune", winprep.install_script([]))
+
 
 if __name__ == "__main__":
     unittest.main()

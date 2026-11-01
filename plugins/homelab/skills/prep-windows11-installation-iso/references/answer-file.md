@@ -39,5 +39,19 @@ Built with Christoph Schneegans' [unattend generator](https://schneegans.de/wind
 
 Drop `XboxApps` from `REMOVE` for Game Pass or Xbox-network PC games, which need the Xbox Identity Provider. You can also reinstall it from the Store later.
 
+## Tune-up after the apps (`scripts/tune-windows.ps1`)
+Runs at the end of `install-apps.ps1`, when every app's shortcuts and Run entries exist, and on a live PC with `tune`. It's idempotent and only reports what it changed.
+
+| Area | Setting |
+| --- | --- |
+| Taskbar | Alignment (`center`/`left`), auto-hide, every tray icon promoted (`alltray`). Clock/calendar (Win+N) and Quick Settings with volume (Win+A) stay at the right of the taskbar |
+| Pins | `TASKBAR_PINS` written as a taskbar layout (`%ProgramFiles%\ivan-the-terminal\taskbar-layout.xml`, "Start Layout" policy, `PinListPlacement="Replace"`). Windows reapplies it only when the file changes, instantly on 26200+. `PinGeneration="1"` keeps an unpinned app unpinned |
+| Autostart | Run entries matching `AUTOSTART_OFF` are marked Disabled, as Task Manager does. Their `StartupApproved` flag survives app updates that re-add the entry |
+| Debloat | Edge uninstalled and blocked from reinstalling (EEA only; the WebView2 runtime stays), Windows Fax and Scan (printing untouched), Phone Link's CrossDevice host |
+| Gaming | Hardware-accelerated GPU scheduling, Game Mode on, Game DVR background recording off, optimizations for windowed games, .NET Framework 3.5 |
+| Logon task | `ivan-the-terminal desktop` runs elevated at logon and every 15 minutes, with no window (`conhost --headless`). It promotes new tray icons and disables launchers that re-registered themselves |
+
+Not touched on purpose: Defender, UAC, Windows Update, the print spooler, SysMain, search indexing and the power plan. Balanced is what AMD and Intel recommend for current CPUs.
+
 ## Changing a setting
 Any generator field can be passed with `GENERATOR_EXTRA="Field=Value ..."`, which overrides the profile. The field names are the form's `name` attributes, visible in the source-URL comment at the top of every generated file. If the site changes a field name, the generated file silently lacks that setting, so compare that comment after a generator update.

@@ -20,6 +20,7 @@ Each installer is downloaded on the prep machine, verified, copied to the stick 
 | `stremio` | Stremio | winget `Stremio.Stremio` (`dl.strem.io`) | winget SHA-256, Authenticode "Smart Code" | NSIS `/S` |
 | `potplayer` | PotPlayer | winget `Daum.PotPlayer` (fixed "Latest" URL) | winget SHA-256, else Authenticode "Kakao Corp" | NSIS `/S` |
 | `toolchain` | every `toolchain.txt` tool with a winget id (Python, PowerShell 7, gh, jq, gitleaks, sops, age, shellcheck, adb, 7-Zip, MAME's chdman) | winget manifests | winget SHA-256, checked again on the target | MSI/MSIX as usual; zip and portable tools unpack to `%LOCALAPPDATA%\Programs\ivan-the-terminal` and go on the user PATH |
+| `runtimes` | what PC games expect: Visual C++ 2005-2022 (x86 + x64), DirectX June 2010 (`dxwebsetup`, fetches the d3dx/XAudio/XInput DLLs at install), XNA 4.0, .NET Desktop Runtime 8 and 10. .NET Framework 3.5 is a Windows feature, enabled by the tune-up | winget manifests (Microsoft download URLs) | winget SHA-256, checked again on the target | each manifest's switches |
 | `winget:<Id>` | any winget package | winget manifest | winget SHA-256 only | the manifest's switches, else the installer type's default |
 
 ## How a winget app is resolved
