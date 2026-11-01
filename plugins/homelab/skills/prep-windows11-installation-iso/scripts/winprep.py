@@ -101,6 +101,10 @@ CATALOG = {
     "gog": {"source": "winget", "id": "GOG.Galaxy", "signer": "GOG", "label": "GOG Galaxy"},
     "vscode": {"source": "winget", "id": "Microsoft.VisualStudioCode", "signer": "Microsoft Corporation", "label": "Visual Studio Code"},
     "git": {"source": "winget", "id": "Git.Git", "signer": None, "label": "Git for Windows"},  # versioned URL: hash only
+    "7zip": {"source": "winget", "id": "7zip.7zip", "signer": None, "label": "7-Zip"},  # unsigned: hash only
+    "qbittorrent": {"source": "winget", "id": "qBittorrent.qBittorrent", "signer": None, "label": "qBittorrent"},  # unsigned
+    "stremio": {"source": "winget", "id": "Stremio.Stremio", "signer": "Smart Code", "label": "Stremio"},
+    "potplayer": {"source": "winget", "id": "Daum.PotPlayer", "signer": "Kakao Corp", "label": "PotPlayer"},  # fixed URL
 }
 # winget packages that need more than their installer: a preferred installer type, a step after installing.
 WINGET_EXTRAS = {

@@ -1,6 +1,6 @@
 ---
 name: prep-windows11-installation-iso
-description: Build a debloated, unattended Windows 11 install USB - latest official ISO, local account (no Microsoft account), ~50 preinstalled apps removed, chosen apps (browsers, Claude, game launchers, VS Code, Git) installed silently at first logon, SSH/age keys and Git restored. Use when Ivan installs or reinstalls Windows, wants a clean Windows USB, or asks to debloat a new install.
+description: Build a debloated, unattended Windows 11 install USB - latest official ISO, local account (no Microsoft account), ~50 preinstalled apps removed, chosen apps (browsers, Claude, launchers, media, dev tools) installed silently at first logon, SSH/age keys and Git restored. Use when Ivan installs or reinstalls Windows, wants a clean Windows USB, or asks to debloat a new install.
 compatibility: Answer file and app payload build on Linux and Windows; writing the USB stick is Linux-only (udisks + wimlib, no sudo).
 ---
 

@@ -15,6 +15,10 @@ Each installer is downloaded on the prep machine, verified, copied to the stick 
 | `epic` | Epic Games Launcher | winget `EpicGames.EpicGamesLauncher` (MSI) | winget SHA-256, else Authenticode "Epic Games" | `msiexec /i ... /quiet /norestart` |
 | `ubisoft` | Ubisoft Connect | winget `Ubisoft.Connect` | winget SHA-256, else Authenticode "Ubisoft" | NSIS `/S` |
 | `gog` | GOG Galaxy | winget `GOG.Galaxy` | winget SHA-256, else Authenticode "GOG" | Inno silent |
+| `7zip` | 7-Zip | winget `7zip.7zip` | winget SHA-256 (unsigned; checked again on the target) | NSIS `/S` |
+| `qbittorrent` | qBittorrent | winget `qBittorrent.qBittorrent` (SourceForge release) | winget SHA-256 (unsigned; checked again on the target) | NSIS `/S` |
+| `stremio` | Stremio | winget `Stremio.Stremio` (`dl.strem.io`) | winget SHA-256, Authenticode "Smart Code" | NSIS `/S` |
+| `potplayer` | PotPlayer | winget `Daum.PotPlayer` (fixed "Latest" URL) | winget SHA-256, else Authenticode "Kakao Corp" | NSIS `/S` |
 | `toolchain` | every `toolchain.txt` tool with a winget id (Python, PowerShell 7, gh, jq, gitleaks, sops, age, shellcheck, adb, 7-Zip, MAME's chdman) | winget manifests | winget SHA-256, checked again on the target | MSI/MSIX as usual; zip and portable tools unpack to `%LOCALAPPDATA%\Programs\ivan-the-terminal` and go on the user PATH |
 | `winget:<Id>` | any winget package | winget manifest | winget SHA-256 only | the manifest's switches, else the installer type's default |
 

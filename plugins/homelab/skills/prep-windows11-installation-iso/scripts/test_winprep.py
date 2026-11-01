@@ -256,6 +256,9 @@ class Config(unittest.TestCase):
         self.assertNotIn("winget:jqlang.jq", names)  # same package as toolchain:jq
         self.assertIn("toolchain:python3", names)
         self.assertEqual(winprep.app_spec("toolchain:pwsh")["prefer"], "wix")
+        names = winprep.app_names(dict(winprep.DEFAULTS, APPS="7zip toolchain"))
+        self.assertEqual(names[0], "7zip")
+        self.assertNotIn("toolchain:7z", names)  # same package as the catalog's 7zip
 
 
 if __name__ == "__main__":
