@@ -61,6 +61,7 @@ flowchart LR
 | [homelab](plugins/homelab) | [`homelab-check`](plugins/homelab/skills/homelab-check) | daily machine health check with notifications: updates, disks, SMART, mounts, services, tailnet | ✅ |
 |  | [`system-updates`](plugins/homelab/skills/system-updates) | updates across every layer of an atomic Fedora / Bazzite machine | ✅ |
 |  | [`tv`](plugins/homelab/skills/tv) | Android TV over adb: apps from official sources, weekly updates | ✅ |
+|  | [`prep-windows11-installation-iso`](plugins/homelab/skills/prep-windows11-installation-iso) | debloated, unattended Windows 11 USB: local account, ~50 apps removed, chosen apps installed silently at first logon, keys and Git restored | ✅ |
 | [career](plugins/career) | [`job-digest`](plugins/career/skills/job-digest) | headless weekday run, no sending; ranked digest in a phone app with push and marks | ✅ |
 | [retro](plugins/retro) | [`rom-library`](plugins/retro/skills/rom-library) | audit the ROM library: CHD/RVZ, playlists, 50 Hz, duplicates | ✅ |
 |  | [`rom-sync`](plugins/retro/skills/rom-sync) | mirror systems to a device over adb or to an SD card | ✅ |

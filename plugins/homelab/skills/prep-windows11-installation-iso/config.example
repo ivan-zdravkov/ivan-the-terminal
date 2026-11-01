@@ -1,0 +1,19 @@
+# ~/.config/ivan-the-terminal/prep-windows11-installation-iso.conf
+# Every key is optional; these are the defaults. Secrets never go here:
+#   WIN11_PASSWORD, WIN11_PRODUCT_KEY in the environment (sops exec-env <secrets>.enc.env '...').
+ACCOUNT="Admin"                 # local administrator created by Setup (no Microsoft account)
+COMPUTER_NAME=""                # empty = random DESKTOP-XXXX
+LANGUAGE="en-US"                # Windows display language (must be in the ISO)
+INPUT="en-US:00000409"          # 1-3 locale:keyboard pairs, first = formats; e.g. "en-US:00000409 bg-BG:00040402"
+GEO_LOCATION="244"              # home location id (244 = United States); an EEA country lets you uninstall Edge
+TIMEZONE=""                     # Windows time zone id, e.g. "W. Europe Standard Time"; empty = automatic
+EDITION="pro"                   # pro | home; must match the product key
+APPS="git vscode brave claude claude-code steam battlenet ea epic ubisoft gog"   # see references/apps.md; winget:<Id> for any other
+# REMOVE="Copilot Recall OneDrive ..."   # apps removed during Setup; default list in references/answer-file.md
+KEYS_VOLUME=""                  # volume label of a drive holding <KEYS_DIR>\ssh\ and <KEYS_DIR>\age\keys.txt; empty = skip
+KEYS_DIR=""                     # folder on that drive, e.g. "Keys"
+GIT_NAME=""                     # git config --global user.name on first logon
+GIT_EMAIL=""                    # git config --global user.email
+ISO_DIR="~/Downloads"           # where the browser saves the ISO
+USB_LABEL="WIN11"               # label given to (and looked up on) the stick
+GENERATOR_EXTRA=""              # extra generator fields, e.g. "ColorMode=Custom SystemColorTheme=Dark AppsColorTheme=Dark"
