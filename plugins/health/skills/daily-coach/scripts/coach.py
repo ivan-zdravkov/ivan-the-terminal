@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -I
 """daily-coach: health samples, daily plans and check-ins in one SQLite file, plus the phone app. Stdlib only.
 
   coach.py serve                 HTTP server: the Daily app (check-in, trends), /ingest for the phone (config: BIND, PORT)

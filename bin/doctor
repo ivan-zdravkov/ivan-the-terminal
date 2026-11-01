@@ -146,7 +146,7 @@ def github():  # skipped offline
         return
     checks = sh("gh", "api", f"repos/{slug}/branches/main/protection",
                 "-q", '.required_status_checks.contexts | sort | join(",")').stdout.strip()
-    if checks == "gitleaks,leakguard,tests":
+    if checks == "gitleaks,leakguard,tests,tests-windows":
         r("ok", "branch-protection")
     elif checks:
         r("warn", "branch-protection", f"required checks are '{checks}'")

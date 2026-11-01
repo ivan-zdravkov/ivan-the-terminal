@@ -20,7 +20,7 @@ gh api -X PUT repos/OWNER/REPO/actions/permissions/workflow \
 
 # main: PRs only, required checks, applies to admins too
 gh api -X PUT repos/OWNER/REPO/branches/main/protection --input - <<'JSON'
-{"required_status_checks":{"strict":false,"contexts":["leakguard","gitleaks","tests"]},
+{"required_status_checks":{"strict":false,"contexts":["leakguard","gitleaks","tests","tests-windows"]},
  "enforce_admins":true,
  "required_pull_request_reviews":{"required_approving_review_count":0},
  "restrictions":null,

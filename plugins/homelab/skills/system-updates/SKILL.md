@@ -1,6 +1,7 @@
 ---
 name: system-updates
 description: Show or apply pending updates across every layer of an atomic Fedora / Bazzite machine - OS image (staged, reboot), Flatpak apps, Homebrew, distrobox containers, firmware. Use when asked to update the system, check for updates, or after homelab-check reports pending updates or a staged image.
+compatibility: Linux, atomic Fedora / Bazzite (rpm-ostree, flatpak, brew); a Windows run.ps1 is on the roadmap
 ---
 
 # System updates

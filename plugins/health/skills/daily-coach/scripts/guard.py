@@ -6,7 +6,7 @@
 - WebFetch: https only, and only WEB_DOMAINs (and their subdomains) when any are given, so an injected page
   can't make the run send health data to another host
 - Write/Edit: only files inside WORK_DIR
-- Bash: a single `TOOLS_DIR/coach <context|plan-set|has-plan|status> ...` or `date`; no chaining or substitution
+- Bash: a single `TOOLS_DIR/coach.py <context|plan-set|has-plan|status> ...` or `date`; no chaining or substitution
 """
 import json
 import re
@@ -51,8 +51,8 @@ def check(tools_dir, work, event, domains=()):
             block("one plain command per call: no pipes, chaining or redirects")
         if words[0] == "date":
             return
-        if words[0] != str(Path(tools_dir) / "coach") or len(words) < 2 or words[1] not in SUBCOMMANDS:
-            block(f"Bash may only run {Path(tools_dir) / 'coach'} {sorted(SUBCOMMANDS)} or date")
+        if words[0] != str(Path(tools_dir) / "coach.py") or len(words) < 2 or words[1] not in SUBCOMMANDS:
+            block(f"Bash may only run {Path(tools_dir) / 'coach.py'} {sorted(SUBCOMMANDS)} or date")
 
 
 def main():
