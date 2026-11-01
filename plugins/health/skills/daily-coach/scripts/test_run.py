@@ -59,7 +59,7 @@ class Runner(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn(" 0 unfilled placeholders", p.stdout)
         self.assertIn("model: test-model", p.stdout)
-        self.assertRegex(p.stdout, r"guard: .*guard\.py .* a\.example b\.example")
+        self.assertRegex(p.stdout, r"guard: .*guard\.py'? .* a\.example b\.example")  # shlex quotes Windows paths
 
     def test_second_run_waits_for_the_lock(self):
         tmp = Path(tempfile.mkdtemp())
