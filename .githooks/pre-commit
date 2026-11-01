@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Block personal data and credentials before they enter a commit."""
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +16,8 @@ def leakguard(*args):
     return cmd + list(args)
 
 
+if not shutil.which("gitleaks"):
+    sys.exit("pre-commit: gitleaks is not installed (itt bootstrap); refusing to commit unscanned")
 for step in (leakguard("staged"),
              ["gitleaks", "git", "--pre-commit", "--staged", "--redact", "--no-banner", "--log-level", "warn", str(ROOT)]):
     if subprocess.run(step).returncode:

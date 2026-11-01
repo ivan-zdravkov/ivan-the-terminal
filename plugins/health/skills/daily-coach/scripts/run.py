@@ -34,7 +34,7 @@ def load_webapp():
 
 
 def tool(name, *args):
-    return [sys.executable, "-I", str(TOOLS / name), *args]
+    return [sys.executable, "-I", "-X", "utf8", str(TOOLS / name), *args]  # UTF-8 pipes on Windows too
 
 
 def prompt_for(work):
@@ -89,6 +89,7 @@ def desktop_notify(title, body):
 
 
 def main(argv):
+    sys.stdout.reconfigure(encoding="utf-8")  # same as the helpers (-X utf8), whatever the Windows code page
     mode = argv[0] if argv else ""
     if not (CONF / "config.env").is_file() or not (CONF / "profile.md").is_file():
         print(f"daily-coach: not configured: create {CONF}/config.env and profile.md "

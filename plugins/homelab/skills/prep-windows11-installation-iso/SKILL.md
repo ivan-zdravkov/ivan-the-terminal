@@ -1,6 +1,6 @@
 ---
 name: prep-windows11-installation-iso
-description: Build a debloated, unattended Windows 11 install USB - latest official ISO, local account (no Microsoft account), ~50 preinstalled apps removed, chosen apps (browsers, Claude, game launchers, VS Code, Git) installed silently at first logon, SSH/age keys and Git restored. Use when Ivan installs or reinstalls Windows, wants a clean Windows USB, or asks to debloat a new install.
+description: Build a debloated, unattended Windows 11 install USB - latest official ISO, local account (no Microsoft account), ~50 preinstalled apps removed, chosen apps (browsers, Claude, launchers, media, dev tools) installed silently at first logon, SSH/age keys and Git restored. Use when Ivan installs or reinstalls Windows, wants a clean Windows USB, or asks to debloat a new install.
 compatibility: Answer file and app payload build on Linux and Windows; writing the USB stick is Linux-only (udisks + wimlib, no sudo).
 ---
 
@@ -15,7 +15,7 @@ Everything is built in `~/.local/state/ivan-the-terminal/prep-windows11-installa
 1. `plan`: shows the account, locale, keyboards, removed apps, first-logon apps and key restore. Confirm them with Ivan. Ask for anything that changed:
    - username, and the password (stored with sops, never in the conf)
    - Home or Pro, and the product key (optional; without one it installs and activates later)
-   - apps to add or drop. App names are in `references/apps.md`; any winget id works as `winget:<Id>`.
+   - apps to add or drop. App names are in `references/apps.md`; any winget id works as `winget:<Id>`. `toolchain` installs everything ivan-the-terminal's doctor checks (`toolchain.txt`: Python, PowerShell 7, gh, sops, age, gitleaks, adb, ...).
 2. `iso`: finds the newest Windows 11 ISO in `ISO_DIR` and prints its SHA-256. If there is none, the script prints the steps for Microsoft's page and Ivan downloads it in his browser. Microsoft blocks scripted downloads, so never try to get around that. Re-run `iso` when it's done.
 3. `answer` (inside `sops exec-env`): writes `autounattend.xml`. Non-secret settings go to the generator site. The password and key are filled in locally afterwards.
 4. `apps`: downloads every installer from its official source and verifies it. It checks the winget manifest SHA-256, the release digest, or Anthropic's checksum; fixed URLs fall back to the Authenticode publisher via `osslsigncode`. It then writes `install-apps.ps1` and `restore-keys.ps1`. A failure names the app; drop it or retry.
@@ -32,7 +32,8 @@ Everything is built in `~/.local/state/ivan-the-terminal/prep-windows11-installa
 
 ## After the install
 - `restore-keys.ps1` copies `KEYS_VOLUME:\KEYS_DIR\ssh` to `~\.ssh` (owner-only ACL) and `age\keys.txt` to `%APPDATA%\sops\age\`. It turns on the OpenSSH agent and points Git at Windows OpenSSH with your name and email. If the drive was unplugged at first logon, plug it in and run `C:\Setup\Installers\restore-keys.ps1`.
-- Then follow `new-machine`. On Windows: clone both repos, then run `claude-sync --restore`, `--restore-history` and `--install-task` from the overlay.
+- After the apps, `tune-windows.ps1` applies the tune-up from the conf (`TASKBAR`, `TASKBAR_PINS`, `AUTOSTART_OFF`, `DEBLOAT`, `STORE_APPS`): taskbar layout and pins, every tray icon shown, launchers kept from autostarting, Edge / Fax and Scan / Phone Link's host removed, gaming settings, .NET 3.5. A logon task (`ivan-the-terminal desktop`) keeps new tray icons visible and launchers off. On a running PC: `tune` (one UAC prompt; output from the elevated window is printed afterwards). Details: `references/answer-file.md`.
+- Then follow `new-machine`: `ssh-add`, `gh auth login`, clone ivan-the-terminal, `itt bootstrap` (with `toolchain` on the stick it only links things up).
 
 ## Fixes
 - The generator site is down or has changed its form: read `references/answer-file.md`. You can pass any generator field with `GENERATOR_EXTRA`.

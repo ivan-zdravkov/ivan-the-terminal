@@ -20,8 +20,10 @@ import base64
 import hmac
 import html
 import json
+import os
 import re
 import secrets
+import shutil
 import struct
 import subprocess
 import sys
@@ -271,13 +273,22 @@ def valid_endpoint(url):
             and any(host == h or (h.startswith(".") and host.endswith(h)) for h in PUSH_HOSTS))
 
 
+def openssl():
+    """The openssl CLI: on PATH, else the copy Git for Windows ships (Windows has none of its own)."""
+    found = shutil.which("openssl")
+    if not found and os.name == "nt":
+        bundled = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "usr" / "bin" / "openssl.exe"
+        found = str(bundled) if bundled.is_file() else None
+    return found or "openssl"
+
+
 class Push:
     def __init__(self, data_dir, subject):
         self.dir, self.subject = Path(data_dir), subject
         self.key, self.file = self.dir / "vapid.pem", self.dir / "push.json"
 
     def _openssl(self, *args, data=None):
-        return subprocess.run(["openssl", *args], input=data, capture_output=True, check=True, timeout=20).stdout
+        return subprocess.run([openssl(), *args], input=data, capture_output=True, check=True, timeout=20).stdout
 
     def public_key(self):
         """applicationServerKey: the uncompressed P-256 point, base64url. Creates the key pair once (owner-only)."""

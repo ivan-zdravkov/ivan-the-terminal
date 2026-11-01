@@ -10,7 +10,7 @@ ITT_HOME = Path(__file__).resolve().parents[1]
 WINDOWS = sys.platform == "win32"
 USAGE = """usage: itt <command> [args]
   doctor [-v] [--update]   health check: toolchain, auth, guards, overlay, links
-  bootstrap                set up / repair this machine (idempotent; Linux only for now)
+  bootstrap [--no-extras]  set up / repair this machine (idempotent; Linux and Windows)
   ship-check               every local gate a branch must pass before it is pushed
   guard <mode> [...]       run leakguard directly (staged | range B H | tree | text F | candidates B H)
   run <skill> [args]       run a skill's entry point: scripts/run.py, else run.sh (Linux) or run.ps1 (Windows)
@@ -56,9 +56,7 @@ def main(args):
     if cmd in ("doctor", "ship-check"):
         run(command(ITT_HOME / "bin" / cmd, rest))
     elif cmd == "bootstrap":
-        if WINDOWS:
-            sys.exit("itt: bootstrap is Linux-only for now (a PowerShell port is planned); see docs/roadmap.md")
-        run(command(ITT_HOME / "bin/bootstrap.sh", rest))
+        run(command(ITT_HOME / "bin/bootstrap.py", rest))
     elif cmd == "guard":
         run(command(ITT_HOME / "tools/leakguard/leakguard.py", rest))
     elif cmd == "run":

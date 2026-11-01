@@ -7,6 +7,7 @@
   run.py apps [app...]               download + verify installers, write install-apps.ps1 and restore-keys.ps1
   run.py usb --device /dev/sdX --format --yes   Linux: format the stick, write ISO + answer file + payload
   run.py usb [--payload-only]        Linux: (re)write onto the stick labelled USB_LABEL
+  run.py tune                        Windows: apply the desktop + gaming tune-up to this PC (UAC prompt)
 
 Config: ~/.config/ivan-the-terminal/prep-windows11-installation-iso.conf (template: config.example).
 Build dir: ~/.local/state/ivan-the-terminal/prep-windows11-installation-iso/ (answer file, payload, downloads).
@@ -15,8 +16,10 @@ The password and product key are only substituted locally; the generator site ne
 import argparse
 import base64
 import hashlib
+import importlib.util
 import json
 import os
+import posixpath
 import re
 import shlex
 import shutil
@@ -34,9 +37,11 @@ SKILL = "prep-windows11-installation-iso"
 CONF = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "ivan-the-terminal" / f"{SKILL}.conf"
 STATE = Path.home() / ".local" / "state" / "ivan-the-terminal" / SKILL
 UA = "ivan-the-terminal/prep-windows11-installation-iso (+https://github.com/ivan-zdravkov/ivan-the-terminal)"
+TUNE = Path(__file__).resolve().parent / "tune-windows.ps1"
 GENERATOR = "https://schneegans.de/windows/unattend-generator/download/"
 WINGET = "microsoft/winget-pkgs"
 PW_PLACEHOLDER = "XPLACEHOLDERX"
+BS = "\\"  # a Windows path separator inside f-strings
 # Microsoft's published generic install keys: they pick the edition but never activate.
 GENERIC_KEYS = {"pro": "VK7JG-NPHTM-C97JM-9MPGT-3V66T", "home": "YTMG3-N6DKC-DKB77-7M9GH-8HVX7"}
 DOWNLOAD_PAGE = "https://www.microsoft.com/software-download/windows11"
@@ -62,6 +67,12 @@ DEFAULTS = {
     "ISO_DIR": "~/Downloads",
     "USB_LABEL": "WIN11",
     "GENERATOR_EXTRA": "",
+    # tune-windows.ps1, run after the apps at first logon (and by `tune` on a live PC)
+    "TASKBAR": "center autohide alltray",
+    "TASKBAR_PINS": "",
+    "AUTOSTART_OFF": "Steam Battle.net EADM EADesktop GalaxyClient GogGalaxy EpicGamesLauncher Ubisoft* Uplay*",
+    "DEBLOAT": "Edge FaxScan CrossDevice",
+    "STORE_APPS": "",
 }
 
 # The debloat profile: every option of the generator we set (see references/answer-file.md).
@@ -98,6 +109,21 @@ CATALOG = {
     "gog": {"source": "winget", "id": "GOG.Galaxy", "signer": "GOG", "label": "GOG Galaxy"},
     "vscode": {"source": "winget", "id": "Microsoft.VisualStudioCode", "signer": "Microsoft Corporation", "label": "Visual Studio Code"},
     "git": {"source": "winget", "id": "Git.Git", "signer": None, "label": "Git for Windows"},  # versioned URL: hash only
+    "7zip": {"source": "winget", "id": "7zip.7zip", "signer": None, "label": "7-Zip"},  # unsigned: hash only
+    "qbittorrent": {"source": "winget", "id": "qBittorrent.qBittorrent", "signer": None, "label": "qBittorrent"},  # unsigned
+    "stremio": {"source": "winget", "id": "Stremio.Stremio", "signer": "Smart Code", "label": "Stremio"},
+    "potplayer": {"source": "winget", "id": "Daum.PotPlayer", "signer": "Kakao Corp", "label": "PotPlayer"},  # fixed URL
+}
+# APPS="runtimes": what PC games expect to find (Visual C++ 2005-2022, legacy DirectX 9-11 DLLs, XNA, .NET).
+# .NET Framework 3.5 is a Windows feature: tune-windows.ps1 enables it.
+RUNTIMES = [f"Microsoft.VCRedist.{v}.{a}" for v in ("2005", "2008", "2010", "2012", "2013", "2015+") for a in ("x86", "x64")]
+RUNTIMES += ["Microsoft.DirectX", "Microsoft.XNARedist", "Microsoft.DotNet.DesktopRuntime.8", "Microsoft.DotNet.DesktopRuntime.10"]
+# winget packages that need more than their installer: a preferred installer type, a step after installing.
+WINGET_EXTRAS = {
+    "Microsoft.PowerShell": {"prefer": "wix"},  # the machine-wide MSI, not the msixbundle
+    "Microsoft.DirectX": {"prefer": "exe"},  # dxwebsetup (the June 2010 DLLs), not the UWP framework appx
+    "Python.PythonInstallManager": {  # the manager alone has no Python: add the default runtime + its PATH entry
+        "post": "& (Join-Path $env:LOCALAPPDATA 'Microsoft\\WindowsApps\\py.exe') install --configure -y"},
 }
 SILENT_DEFAULTS = {"inno": "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART", "nullsoft": "/S",
                    "burn": "/quiet /norestart", "msi": "/quiet /norestart", "wix": "/quiet /norestart"}
@@ -134,18 +160,46 @@ def load_conf(path=CONF):
     return conf
 
 
+def toolchain_rows():
+    """toolchain.txt rows Windows gets from winget (APPS="toolchain"): ivan-the-terminal's tools, core and extra."""
+    module = Path(__file__).resolve().parents[5] / "tools" / "toolchain.py"
+    if not module.is_file():
+        die("APPS has 'toolchain', which needs an ivan-the-terminal checkout (tools/toolchain.py)")
+    spec = importlib.util.spec_from_file_location("toolchain", module)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return [r for r in mod.read() if r["winget"]]
+
+
 def app_names(conf):
-    names = conf["APPS"].split()
+    names = []
+    for n in conf["APPS"].split():
+        if n == "toolchain":
+            names += [f"toolchain:{r['cmd']}" for r in toolchain_rows()]
+        elif n == "runtimes":
+            names += [f"winget:{pid}" for pid in RUNTIMES]
+        elif n in CATALOG or n.startswith("winget:"):
+            names.append(n)
+        else:
+            die(f"unknown app '{n}' in APPS (known: {' '.join(CATALOG)}, toolchain, runtimes, or winget:<Package.Id>)")
+    seen, unique = set(), []  # one install per package: e.g. "git" and the toolchain's Git.Git
     for n in names:
-        if n not in CATALOG and not n.startswith("winget:"):
-            die(f"unknown app '{n}' in APPS (known: {' '.join(CATALOG)}, or winget:<Package.Id>)")
-    return names
+        key = app_spec(n).get("id") or n
+        if key not in seen:
+            seen.add(key)
+            unique.append(n)
+    return unique
 
 
 def app_spec(name):
     if name.startswith("winget:"):
         pid = name.split(":", 1)[1]
-        return {"source": "winget", "id": pid, "signer": None, "label": pid}
+        return {"source": "winget", "id": pid, "signer": None, "label": pid, **WINGET_EXTRAS.get(pid, {})}
+    if name.startswith("toolchain:"):
+        cmd = name.split(":", 1)[1]
+        row = next((r for r in toolchain_rows() if r["cmd"] == cmd), None) or die(f"no '{cmd}' in toolchain.txt")
+        return {"source": "winget", "id": row["winget"], "signer": None, "label": f"{cmd} ({row['winget']})",
+                "cmd": cmd, "win_dir": row["win_dir"], **WINGET_EXTRAS.get(row["winget"], {})}
     return CATALOG[name]
 
 
@@ -258,8 +312,9 @@ def winget_manifest(pid):
     return version, yaml_load(text.decode("utf-8"))
 
 
-def pick_installer(manifest, arch="x64"):
-    """Machine scope and our arch first, then neutral/x86; top-level fields are the defaults."""
+def pick_installer(manifest, arch="x64", prefer=None):
+    """PREFER's installer type when offered, then machine scope and our arch, then neutral/x86; top-level fields
+    are the defaults."""
     shared = {k: v for k, v in manifest.items() if k != "Installers"}
     cands = []
     for inst in manifest.get("Installers") or []:
@@ -272,10 +327,13 @@ def pick_installer(manifest, arch="x64"):
     cands = [c for c in cands if c.get("Architecture") in rank_arch]
     if not cands:
         raise LookupError(f"no {arch}/neutral/x86 installer")
+    if prefer and any((c.get("InstallerType") or "").lower() == prefer for c in cands):
+        cands = [c for c in cands if (c.get("InstallerType") or "").lower() == prefer]
     return min(cands, key=lambda c: (rank_arch[c.get("Architecture")], 0 if c.get("Scope", "machine") == "machine" else 1))
 
 
-def silent_args(inst):
+def silent_args(inst, location=None):
+    """(type, switches); LOCATION fills <INSTALLPATH> when the installer needs one and the manifest has no default."""
     kind = (inst.get("InstallerType") or "exe").lower()
     sw = inst.get("InstallerSwitches") or {}
     args = sw.get("Silent") or SILENT_DEFAULTS.get(kind, "")
@@ -283,7 +341,7 @@ def silent_args(inst):
         if word not in args.split():
             args = f"{args} {word}".strip()
     if inst.get("InstallLocationRequired") in (True, "true") and sw.get("InstallLocation"):
-        loc = (inst.get("InstallationMetadata") or {}).get("DefaultInstallLocation")
+        loc = (inst.get("InstallationMetadata") or {}).get("DefaultInstallLocation") or location
         if loc:
             args = f"{args} {sw['InstallLocation'].replace('<INSTALLPATH>', loc)}".strip()
     return kind, args
@@ -333,12 +391,17 @@ def resolve(name):
     src = spec["source"]
     if src == "winget":
         version, man = winget_manifest(spec["id"])
-        inst = pick_installer(man)
-        kind, args = silent_args(inst)
+        inst = pick_installer(man, prefer=spec.get("prefer"))
+        kind, args = silent_args(inst, spec.get("win_dir"))
+        if kind == "zip" and (inst.get("NestedInstallerType") or "").lower() != "portable":
+            raise LookupError("only zips of portable programs are supported")
         url = inst["InstallerUrl"]
-        ext = {"msi": ".msi", "wix": ".msi", "msix": ".msix"}.get(kind, ".exe")
+        ext = {"msi": ".msi", "wix": ".msi", "msix": ".msix", "zip": ".zip"}.get(kind, ".exe")
+        nested = [f["RelativeFilePath"] for f in inst.get("NestedInstallerFiles") or []]
+        alias = spec.get("cmd") or ((inst.get("Commands") or []) + [spec["id"].split(".")[-1].lower()])[0]
         return {"version": version, "url": url, "sha256": inst["InstallerSha256"].lower(), "type": kind,
-                "args": args, "signer": spec.get("signer"), "file": f"{name.replace(':', '-')}-{version}{ext}"}
+                "args": args, "signer": spec.get("signer"), "file": f"{name.replace(':', '-')}-{version}{ext}",
+                "nested": nested, "alias": alias, "win_dir": spec.get("win_dir"), "post": spec.get("post")}
     if src == "github":
         rel = http(f"https://api.github.com/repos/{spec['repo']}/releases/latest", as_json=True)
         asset = next(a for a in rel["assets"] if a["name"] == spec["asset"])
@@ -387,12 +450,27 @@ def ps_quote(s):
     return "'" + s.replace("'", "''") + "'"
 
 
-def install_script(items):
-    """PowerShell run at first logon from C:\\Setup\\Installers (items: [(name, info)])."""
+def tune_call(conf, script, log=None):
+    """PowerShell call of tune-windows.ps1 (SCRIPT: a PowerShell path expression) with the conf's settings."""
+    args = [("Taskbar", "TASKBAR"), ("Pins", "TASKBAR_PINS"), ("AutostartOff", "AUTOSTART_OFF"),
+            ("Debloat", "DEBLOAT"), ("StoreApps", "STORE_APPS")]
+    call = f"& {script}" + "".join(f" -{p} {ps_quote(conf[k])}" for p, k in args)
+    return call + (f" -Log {ps_quote(log)}" if log else "")
+
+
+def install_script(items, tune=None):
+    """PowerShell run at first logon from C:\\Setup\\Installers (items: [(name, info)]; TUNE: a tune_call)."""
     out = ["# Generated by ivan-the-terminal prep-windows11-installation-iso. Re-run by hand if anything failed.",
            "$dir = $PSScriptRoot",
            "Start-Transcript -Path (Join-Path $dir 'install-apps.log') -Append | Out-Null",
            "$report = @()",
+           "$tools = Join-Path $env:LOCALAPPDATA 'Programs\\ivan-the-terminal'  # zip and portable tools",
+           "function AddPath($d) {",
+           "  $d = [Environment]::ExpandEnvironmentVariables($d)",
+           "  $p = [Environment]::GetEnvironmentVariable('Path', 'User')",
+           "  if (($p -split ';') -notcontains $d) { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';' + $d).TrimStart(';'), 'User') }",
+           "}",
+           "function Hashed($file, $sha) { return (Get-FileHash -Algorithm SHA256 (Join-Path $dir $file)).Hash -eq $sha }",
            "function Signed($file, $signer) {",
            "  $s = Get-AuthenticodeSignature -FilePath (Join-Path $dir $file)",
            "  return $s.Status -eq 'Valid' -and (-not $signer -or $s.SignerCertificate.Subject -like \"*$signer*\")",
@@ -410,10 +488,25 @@ def install_script(items):
         label, f = ps_quote(text), ps_quote(info["file"])
         path = f"(Join-Path $dir {f})"
         kind = info["type"]
-        if kind != "msix":  # Add-AppxPackage verifies MSIX signatures itself
+        if kind in ("zip", "portable") or (kind != "msix" and info.get("sha256") and not info.get("signer")):
+            # no publisher to check (often unsigned, e.g. 7-Zip): the winget SHA-256 is checked again on the target
+            sha = ps_quote(info["sha256"].upper())
+            out.append(f"if (-not (Hashed {f} {sha})) {{ $report += {ps_quote(text + ': SKIPPED, hash mismatch')} }} else {{")
+        elif kind != "msix":  # Add-AppxPackage verifies MSIX signatures itself
             signer = ps_quote(info.get("signer") or "")
             out.append(f"if (-not (Signed {f} {signer})) {{ $report += {ps_quote(text + ': SKIPPED, signature not valid')} }} else {{")
-        if kind in ("msi", "wix"):
+        if kind == "zip":
+            dest = f"(Join-Path $tools {ps_quote(name.replace(':', '-'))})"
+            out.append(f"Expand-Archive -Path {path} -DestinationPath {dest} -Force")
+            for d in sorted({posixpath.dirname(n) for n in info.get("nested") or []}):
+                out.append(f"AddPath {dest}" if not d else f"AddPath (Join-Path {dest} {ps_quote(d.replace('/', BS))})")
+            out.append(f"$report += {ps_quote(text + ': installed')}")
+        elif kind == "portable":
+            exe = ps_quote(f"bin{BS}{info['alias']}.exe")
+            out.append("New-Item -ItemType Directory -Force (Join-Path $tools 'bin') | Out-Null")
+            out.append(f"Copy-Item {path} (Join-Path $tools {exe}) -Force; AddPath (Join-Path $tools 'bin')")
+            out.append(f"$report += {ps_quote(text + ': installed')}")
+        elif kind in ("msi", "wix"):
             args = ps_quote(f'/i "{{0}}" {info["args"]}'.strip())
             out.append(f"$report += Run {label} 'msiexec.exe' ({args} -f {path})")
         elif kind == "msix":
@@ -426,8 +519,14 @@ def install_script(items):
             if "%" in info["args"]:  # e.g. %PROGRAMFILES(X86)% in an install path; Start-Process won't expand it
                 args = f"([Environment]::ExpandEnvironmentVariables({args}))"
             out.append(f"$report += Run {label} {path} {args}")
+        if info.get("win_dir"):
+            out.append(f"AddPath {ps_quote(info['win_dir'])}")
+        if info.get("post"):
+            out.append(f"{info['post']}; $report += {ps_quote(text + ': setup exit code ')} + $LASTEXITCODE")
         if kind != "msix":
             out.append("}")
+    if tune:  # after every app, so their shortcuts and Run entries exist
+        out.append(f"{tune} | ForEach-Object {{ $report += \"tune: $_\" }}")
     out += ["$keys = Join-Path $dir 'restore-keys.ps1'",
             "if (Test-Path $keys) { & $keys; $report += \"keys and git: exit code $LASTEXITCODE\" }",
             "$report | Tee-Object -FilePath (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Setup report.txt')",
@@ -674,7 +773,9 @@ def cmd_plan(conf, a):
         f"edition {conf['EDITION']}, language {conf['LANGUAGE']}, input {conf['INPUT']}, "
         f"geo {conf['GEO_LOCATION']}, timezone {conf['TIMEZONE'] or '(automatic)'}")
     say(f"apps at first logon: {', '.join(app_spec(n)['label'] for n in app_names(conf)) or 'none'}")
-    say(f"removed: {conf['REMOVE']}")
+    say(f"removed: {conf['REMOVE']}; after the apps: {conf['DEBLOAT'] or 'nothing'}")
+    say(f"taskbar: {conf['TASKBAR'] or 'unchanged'}; pins: {conf['TASKBAR_PINS'] or 'unchanged'}; "
+        f"autostart off: {conf['AUTOSTART_OFF'] or '-'}; Store apps: {conf['STORE_APPS'] or '-'}")
     say(f"keys: {conf['KEYS_VOLUME'] + ':' + chr(92) + conf['KEYS_DIR'] if conf['KEYS_VOLUME'] else 'not restored'}"
         f"; git identity: {conf['GIT_NAME'] or '-'} <{conf['GIT_EMAIL'] or '-'}>")
     say(f"secrets in env: WIN11_PASSWORD {'set' if 'WIN11_PASSWORD' in os.environ else 'MISSING'}, "
@@ -734,7 +835,9 @@ def cmd_apps(conf, a):
     payload.mkdir(parents=True)
     for _, info in items:
         shutil.copyfile(cache / info["file"], payload / info["file"])
-    (payload / "install-apps.ps1").write_text(install_script(items), encoding="utf-8-sig", newline="\r\n")
+    shutil.copyfile(TUNE, payload / TUNE.name)
+    tune = tune_call(conf, f"(Join-Path $dir {ps_quote(TUNE.name)})")
+    (payload / "install-apps.ps1").write_text(install_script(items, tune), encoding="utf-8-sig", newline="\r\n")
     (payload / "restore-keys.ps1").write_text(keys_script(conf), encoding="utf-8-sig", newline="\r\n")
     (payload / "apps.json").write_text(json.dumps({n: i for n, i in items}, indent=1), encoding="utf-8")
     size = sum(f.stat().st_size for f in payload.iterdir()) / 2**20
@@ -774,6 +877,22 @@ def cmd_usb(conf, a):
     return 0
 
 
+def cmd_tune(conf, a):
+    if sys.platform != "win32":
+        die("tune changes this Windows PC; run it on Windows")
+    log = Path(tempfile.gettempdir()) / "ivan-the-terminal-tune.log"
+    log.unlink(missing_ok=True)
+    inner = tune_call(conf, ps_quote(str(TUNE)), str(log))
+    encoded = base64.b64encode(inner.encode("utf-16-le")).decode()  # no quoting through Start-Process
+    outer = ("$p = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ArgumentList "
+             f"'-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand','{encoded}'; exit $p.ExitCode")
+    p = subprocess.run(["powershell.exe", "-NoProfile", "-Command", outer])
+    if log.exists():  # the elevated window's output, minus the transcript header and footer
+        parts = re.split(r"\*{10,}", log.read_text(encoding="utf-8", errors="replace"))
+        say((parts[2] if len(parts) > 2 else parts[0]).strip())
+    return p.returncode
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Prepare a debloated, unattended Windows 11 install USB.")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -787,9 +906,10 @@ def main(argv=None):
     p.add_argument("--format", action="store_true")
     p.add_argument("--yes", action="store_true")
     p.add_argument("--payload-only", action="store_true")
+    sub.add_parser("tune")
     a = ap.parse_args(argv)
     conf = load_conf()
-    return {"plan": cmd_plan, "iso": cmd_iso, "answer": cmd_answer, "apps": cmd_apps, "usb": cmd_usb}[a.cmd](conf, a) or 0
+    return {"plan": cmd_plan, "iso": cmd_iso, "answer": cmd_answer, "apps": cmd_apps, "usb": cmd_usb, "tune": cmd_tune}[a.cmd](conf, a) or 0
 
 
 if __name__ == "__main__":

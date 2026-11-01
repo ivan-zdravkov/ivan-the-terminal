@@ -1,9 +1,17 @@
-# command   brew-formula   purpose
-git         git            version control
-gh          gh             GitHub CLI: repos, PRs, secrets
-jq          jq             JSON in shell scripts
-gitleaks    gitleaks       credential scanning (hooks + CI)
-sops        sops           encrypted secrets in the private overlay
-age         age            encryption backend for sops
-shellcheck  shellcheck     lint for the remaining shell scripts
-python3     python@3.13    itt, hooks, leakguard and skill scripts (stdlib only)
+# Tools ivan-the-terminal needs. itt bootstrap installs them, doctor checks them, and the Windows ISO skill
+# installs them at first logon (APPS="toolchain"). "-" = not managed on that OS.
+#   tier     core: required (doctor fails without it); extra: needed by one skill (doctor warns)
+#   win-dir  Windows: where the tool lands, added to PATH (and the install location when the installer needs one)
+# command    brew         winget                        tier   win-dir                        purpose
+git          git          Git.Git                       core   -                              version control
+gh           gh           GitHub.cli                    core   -                              GitHub CLI: repos, PRs, secrets
+jq           jq           jqlang.jq                     core   -                              JSON filters (job-digest q.py)
+gitleaks     gitleaks     Gitleaks.Gitleaks             core   -                              credential scanning (hooks + CI)
+sops         sops         SecretsOPerationS.SOPS        core   -                              encrypted secrets in the private overlay
+age          age          FiloSottile.age               core   -                              encryption backend for sops and claude-sync
+shellcheck   shellcheck   koalaman.shellcheck           core   -                              lint for the remaining shell scripts
+python3      python@3.13  Python.PythonInstallManager   core   -                              itt, hooks, leakguard and skill scripts (stdlib only)
+pwsh         -            Microsoft.PowerShell          core   -                              PowerShell 7: run.ps1 entry points, claude-home profile
+adb          -            Google.PlatformTools          extra  -                              tv, rom-sync: Android devices over adb
+7z           p7zip        7zip.7zip                     extra  %ProgramFiles%\7-Zip           rom-library: archives
+chdman       rom-tools    MAMEdev.MAME                  extra  %LOCALAPPDATA%\Programs\MAME   rom-library: CHD conversion

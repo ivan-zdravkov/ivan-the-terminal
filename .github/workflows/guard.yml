@@ -73,7 +73,7 @@ jobs:
           : > "$RUNNER_TEMP/gitleaksignore"
           "$RUNNER_TEMP/gitleaks" git --config "$cfg" --gitleaks-ignore-path "$RUNNER_TEMP/gitleaksignore" --redact --no-banner -v .
 
-  tests:
+  tests-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

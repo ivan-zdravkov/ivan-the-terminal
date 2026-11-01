@@ -10,10 +10,12 @@
 
 `itt bootstrap` wires it together, idempotently:
 
-- skills from `plugins/*/skills/*` (and the overlay's `skills/`) → symlinks in `~/.claude/skills/`, so edits are live and work from any directory
+- the toolchain from `toolchain.txt` (brew on Linux, winget on Windows; core tools plus per-skill extras)
+- skills from `plugins/*/skills/*` (and the overlay's `skills/`) → symlinks in `~/.claude/skills/` (junctions on Windows), so edits are live and work from any directory
 - the overlay's `config/ivan-the-terminal/` → `~/.config/ivan-the-terminal/` (private CLAUDE.md, denylist, per-skill config)
 - Claude Code auto-memory for listed project directories → the overlay's `memory/` (versioned, follows me to new machines)
-- `itt` → `~/.local/bin/itt`
+- `itt` → `~/.local/bin/itt` (Windows: an `itt.cmd` shim there, added to PATH)
+- interactive `claude` starts in this repo: `shell/claude-home.bash` (`~/.bashrc.d`) or `shell/claude-home.ps1` (PowerShell profiles)
 
 ## Context loading
 
@@ -35,7 +37,7 @@ Skills that report something daily store the result locally and serve it as a ho
 
 ## Portability
 
-Everything that can be is stdlib Python, so the same skills run on Linux and Windows (CI tests both): `itt`, doctor, ship-check, the git hooks, leakguard and the skill scripts. Work tied to one OS stays native and says so: `bin/bootstrap.sh`, systemd units, and `scripts/run.sh` in skills like homelab-check. Their Windows twins (`.ps1`, Task Scheduler) are tracked in the [roadmap](roadmap.md#windows).
+Everything that can be is stdlib Python, so the same skills run on Linux and Windows (CI tests both): `itt`, doctor, ship-check, the git hooks, leakguard and the skill scripts. `itt bootstrap` is Python too, with one branch per OS for the package manager, links and services. Work tied to one OS stays native and says so: systemd units, the shell wrappers in `shell/`, and `scripts/run.sh` in skills like homelab-check. Their Windows twins (`.ps1`, Task Scheduler) are tracked in the [roadmap](roadmap.md#windows).
 
 ## Secrets
 

@@ -18,10 +18,8 @@ Skills distilled from months of real sessions, each turned generic here with per
 
 ## Windows
 
-Skills are portable Python first (see [skill-authoring.md](skill-authoring.md) rule 12): every skill except homelab-check and system-updates enters through `scripts/run.py`, and CI tests both OSes. Still Linux-only, each to get a PowerShell twin:
+Skills are portable Python first (see [skill-authoring.md](skill-authoring.md) rule 12): every skill except homelab-check and system-updates enters through `scripts/run.py`, and CI tests both OSes. `itt bootstrap`, doctor and the interactive-`claude` wrapper (`shell/claude-home.ps1`) work on Windows. Still Linux-only, each to get a Windows twin:
 
-- `itt bootstrap` → `bin/bootstrap.ps1`: winget/scoop toolchain, skill links, `itt` shim on PATH
 - systemd timers and services → Task Scheduler tasks; doctor's scheduler checks
 - headless runs (daily-coach, job-digest) → allowlist and guard for the PowerShell tool (`--serve` and `--dry-run` already work); the daily-coach wake `TRIGGER` default is systemd
 - homelab-check, system-updates → `run.ps1` (Windows Update, winget, disks, event log)
-- `shell/claude-home.bash` → PowerShell profile; the leakguard Claude hook command in `.claude/settings.json`
