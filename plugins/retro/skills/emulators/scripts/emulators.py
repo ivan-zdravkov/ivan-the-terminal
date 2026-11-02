@@ -480,23 +480,28 @@ def sdl_xinput_guid(vendor, product, version, subtype=1):
 VIRTUAL_X360 = sdl_xinput_guid(0x045E, 0x028E, 0x0114)
 
 
-def eden_pro_controller(guid):
-    """Eden [Controls] values for player 1 as a Pro Controller on an XInput pad, by button position
-    (Xbox A/bottom -> Switch B, B/right -> A, X/left -> Y, Y/top -> X), which is Eden's own SDL default."""
+PRO_CONTROLLER, HANDHELD = 0, 4  # Eden's Settings::ControllerType
+HANDHELD_SLOT = 8  # players[8] is the console in handheld mode
+
+
+def eden_pro_controller(guid, slot=0, ctype=PRO_CONTROLLER):
+    """Eden [Controls] values for a player on an XInput pad, by button position (Xbox A/bottom -> Switch B,
+    B/right -> A, X/left -> Y, Y/top -> X), which is Eden's own SDL default. Slot 0 = player 1."""
     def p(**kw):
         return '"' + ",".join(f"{k}:{v}" for k, v in {"engine": "sdl", "port": 0, "guid": guid, **kw}.items()) + '"'
 
+    n = f"player_{slot}_"
     buttons = {"a": 1, "b": 0, "x": 3, "y": 2, "lstick": 8, "rstick": 9, "l": 4, "r": 5, "plus": 7, "minus": 6,
                "home": 10, "slleft": 4, "srleft": 5, "slright": 4, "srright": 5}
-    values = {"player_0_type": "0", "player_0_connected": "true"}
-    values.update({f"player_0_button_{k}": p(button=v) for k, v in buttons.items()})
-    values.update({f"player_0_button_d{d}": p(hat=0, direction=d) for d in ("left", "up", "right", "down")})
-    values.update({"player_0_button_zl": p(axis=2, threshold=0.5, invert="+"),
-                   "player_0_button_zr": p(axis=5, threshold=0.5, invert="+"),
-                   "player_0_lstick": p(axis_x=0, axis_y=1, offset_x="0.000000", offset_y="0.000000",
-                                        invert_x="+", invert_y="+"),
-                   "player_0_rstick": p(axis_x=3, axis_y=4, offset_x="0.000000", offset_y="0.000000",
-                                        invert_x="+", invert_y="+")})
+    values = {f"{n}type": str(ctype), f"{n}connected": "true"}
+    values.update({f"{n}button_{k}": p(button=v) for k, v in buttons.items()})
+    values.update({f"{n}button_d{d}": p(hat=0, direction=d) for d in ("left", "up", "right", "down")})
+    values.update({f"{n}button_zl": p(axis=2, threshold=0.5, invert="+"),
+                   f"{n}button_zr": p(axis=5, threshold=0.5, invert="+"),
+                   f"{n}lstick": p(axis_x=0, axis_y=1, offset_x="0.000000", offset_y="0.000000",
+                                   invert_x="+", invert_y="+"),
+                   f"{n}rstick": p(axis_x=3, axis_y=4, offset_x="0.000000", offset_y="0.000000",
+                                   invert_x="+", invert_y="+")})
     out = {}
     for k, v in values.items():  # Eden ignores a value unless its "\default" flag says it isn't the default
         out[f"{k}\\default"] = "false"
@@ -504,10 +509,34 @@ def eden_pro_controller(guid):
     return out
 
 
-def eden_bind_pad(p, guid):
+def eden_handheld_game(guid, scale):
+    """Per-game sections for a game that refuses the Pro Controller (Let's Go Pikachu/Eevee want one Joy-Con with
+    motion when docked): handheld mode, player 1 as Handheld on the same pad, `scale` x the handheld 720p.
+    A per-game file only overrides the global controls when it names an input profile."""
+    flag = {"\\use_global": "false", "\\default": "false"}
+    controls = {"player_0_profile_name": '"itt-handheld"', **eden_pro_controller(guid, 0, HANDHELD)}
+    return {"Controls": controls,
+            "System": {f"use_docked_mode{k}": v for k, v in flag.items()} | {"use_docked_mode": "0"},
+            "Renderer": {f"resolution_setup{k}": v for k, v in flag.items()} | {"resolution_setup": str(scale)}}
+
+
+def eden_bind_pad(p, guid, conf=None):
+    """Bind the pad everywhere Eden reads controls: player 1 + the handheld slot globally, and every
+    SWITCH_HANDHELD game's own config."""
+    changed = False
     cfg = p.eden_user / "config" / "qt-config.ini"
     text = cfg.read_text(encoding="utf-8") if cfg.is_file() else ""
-    return write_if_changed(cfg, set_ini(text, "Controls", eden_pro_controller(guid)))
+    text = set_ini(text, "Controls", eden_pro_controller(guid))
+    changed |= write_if_changed(cfg, set_ini(text, "Controls", eden_pro_controller(guid, HANDHELD_SLOT, HANDHELD)))
+    conf = conf or {}
+    scale = EDEN_SCALES.get(conf.get("SWITCH_HANDHELD_RES_SCALE", "2").rstrip("0").rstrip(".") or "1", 6)
+    for tid in re.findall(r"[0-9A-Fa-f]{16}", conf.get("SWITCH_HANDHELD", "")):
+        game = p.eden_user / "config" / "custom" / f"{tid.upper()}.ini"
+        text = game.read_text(encoding="utf-8") if game.is_file() else ""
+        for section, values in eden_handheld_game(guid, scale).items():
+            text = set_ini(text, section, values)
+        changed |= write_if_changed(game, text)
+    return changed
 
 
 def desk_pad(conf):
@@ -531,7 +560,7 @@ def cmd_pad(args, conf):
                                                                                                args.which)
     if not guid or not re.fullmatch(r"[0-9a-f]{32}", guid):
         die(f"no pad for '{args.which}': connect it, or set SWITCH_PAD to its GUID (see `pads`)")
-    changed = eden_bind_pad(p, guid)
+    changed = eden_bind_pad(p, guid, conf)
     print(f"pad: Eden player 1 -> {args.which} {guid}{'' if changed else ' (already)'}")
 
 
@@ -687,8 +716,10 @@ def setup_eden(p, conf, notes, problems):
     pad = desk_pad(conf)
     if not pad:
         problems.append("eden: no controller to bind - connect the pad (or set SWITCH_PAD) and re-run setup")
-    elif needs_pad_binding(text, pad) and eden_bind_pad(p, pad):
-        notes.append(f"eden: player 1 = Pro Controller on {pad} (buttons by position)")
+    elif needs_pad_binding(text, pad) or conf.get("SWITCH_HANDHELD"):
+        if eden_bind_pad(p, pad, conf):
+            notes.append(f"eden: player 1 = Pro Controller on {pad} (buttons by position)"
+                         + (f"; handheld for {conf['SWITCH_HANDHELD']}" if conf.get("SWITCH_HANDHELD") else ""))
 
 
 def needs_pad_binding(text, pad):

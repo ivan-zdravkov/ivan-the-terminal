@@ -144,6 +144,27 @@ class Controllers(unittest.TestCase):
         self.assertEqual(v["player_0_type"], "0")  # Pro Controller
         self.assertTrue(all(v[k + "\\default"] == "false" for k in v if not k.endswith("\\default")))
 
+    def test_handheld_game_overrides_controls_and_mode(self):
+        guid = "1" * 32
+        s = emulators.eden_handheld_game(guid, 6)
+        self.assertEqual(s["Controls"]["player_0_type"], "4")  # Handheld
+        self.assertTrue(s["Controls"]["player_0_profile_name"].strip('"'))  # else Eden uses the global controls
+        self.assertEqual((s["System"]["use_docked_mode"], s["System"]["use_docked_mode\\use_global"]), ("0", "false"))
+        self.assertEqual(s["Renderer"]["resolution_setup"], "6")  # 2x
+
+    def test_bind_pad_writes_handheld_slot_and_games(self):
+        with tempfile.TemporaryDirectory() as t:
+            p = emulators.Paths({"EMULATION_ROOT": t, "EMU_DIR": t})
+            p.eden_user = Path(t) / "eden"
+            guid = "2" * 32
+            self.assertTrue(emulators.eden_bind_pad(p, guid, {"SWITCH_HANDHELD": "010003F003A34000"}))
+            glob = (p.eden_user / "config" / "qt-config.ini").read_text(encoding="utf-8")
+            self.assertIn(f"player_8_button_a=\"engine:sdl,port:0,guid:{guid},button:1\"", glob)
+            self.assertIn("player_8_type=4", glob)
+            game = (p.eden_user / "config" / "custom" / "010003F003A34000.ini").read_text(encoding="utf-8")
+            self.assertIn(f"guid:{guid}", game)
+            self.assertFalse(emulators.eden_bind_pad(p, guid, {"SWITCH_HANDHELD": "010003F003A34000"}))
+
     def test_rebind_rules(self):
         desk, other = "1" * 32, "2" * 32
         self.assertTrue(emulators.needs_pad_binding("", desk))

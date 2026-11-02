@@ -82,5 +82,6 @@ GAME="switch|Some Game [0100000000000000][v0].nsp|Some Game|<optional steamgridd
 | A 60 fps mod does nothing | the mod is for another game version; see its `.pchtxt` file names |
 | Game runs at double speed | the 60 fps patch ties game speed to frame rate; take it out of the config and re-run setup |
 | Steam art wrong | set the SteamGridDB id as the fourth `GAME=` field |
+| Pokemon Let's Go stuck on "Press a button on the controller you want to use" | it doesn't accept a Pro Controller when docked: add its title id to `SWITCH_HANDHELD` (handheld mode, button throws, 2× = 1440p) and re-run `setup eden` with Eden closed |
 | Switch game doesn't react to the pad | at the desk: `emulators pad desk`. While streaming: run `emulators pads`; if Moonlight's pad shows another GUID, put it in `SWITCH_PAD_STREAM` and re-run `emulators games switch` |
 | PS3 game listens to the wrong pad | RPCS3 uses the first XInput slot; switch the other pad off |

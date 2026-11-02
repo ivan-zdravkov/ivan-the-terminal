@@ -36,4 +36,5 @@ For the folder layout, what each setting does and why, read `README.md`.
 - `keys`/firmware errors in Eden: `prod.keys`, `title.keys` and a `Firmware*.zip` must be under `bios/`; re-run setup after replacing them.
 - Game too fast/slow after a 60 fps patch: the patch ties game speed to frame rate; turn it off in the config (`SWITCH_MODS`, `*_PATCH_*`) and re-run setup.
 - Stream shows the desktop: see add-game's Fixes (Apollo virtual display + `ensure_primary`).
+- Switch game stuck on "Press a button on the controller you want to use" (Pokemon Let's Go): it refuses a Pro Controller when docked; add its title id to `SWITCH_HANDHELD` and re-run `setup eden` with Eden closed (it rewrites its config on exit).
 - Switch game ignores the pad: during a stream run `pads`; if Moonlight's pad GUID differs from `pad stream`'s, set `SWITCH_PAD_STREAM` to it and re-run `games switch`. At the desk: `pad desk`. A PS3 game on the wrong pad: XInput slot order, the first connected pad is `#1`.
