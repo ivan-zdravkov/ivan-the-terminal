@@ -215,6 +215,9 @@ if ($ap) {
             'upnp' = 'disabled'  # no router port mappings: remote clients come in over Tailscale
             'headless_mode' = $(if ($ap -contains 'headless') { 'enabled' } else { 'disabled' })
             'isolated_virtual_display_option' = $(if ($ap -contains 'isolated') { 'enabled' } else { 'disabled' })
+            # always a virtual Xbox 360 pad: "auto" turns a PlayStation-style client pad into a DualShock 4,
+            # which XInput-only games and emulators (RPCS3, Eden's stream binding) never see
+            'gamepad' = 'x360'
         }
         $lines = [Collections.Generic.List[string]]([IO.File]::ReadAllLines($apolloConf))
         $c = @()
