@@ -418,7 +418,8 @@ def setup_rpcs3(p, conf, notes, problems):
     rpcs3_patches(home, conf, games, notes, problems)
     pad = home / "config" / "input_configs" / "global" / "Default.yml"
     current = pad.read_text(encoding="utf-8") if pad.is_file() else ""
-    if not re.search(r"^Player 1 Input:\n  Handler: (?!Null|Keyboard)", current, re.M):  # keep a pad set up by hand
+    hand_made = re.search(r"^Player 1 Input:\n  Handler: (?!Null|Keyboard)", current, re.M)
+    if not hand_made or "  Device: XInput Pad #" in current:  # keep a pad set up by hand; fix our unquoted one
         write_if_changed(pad, rpcs3_input())
         notes.append("rpcs3: player 1 = XInput Pad #1 (A=Cross, B=Circle, X=Square, Y=Triangle)")
     if not (home / "dev_flash" / "vsh" / "etc" / "version.txt").is_file():
@@ -437,7 +438,7 @@ def rpcs3_input():
              "L2": "LT", "L3": "LS", "Left Stick Deadzone": 7849, "Right Stick Deadzone": 8689,
              "Left Stick Anti-Deadzone": 4259, "Right Stick Anti-Deadzone": 4259, "Left Trigger Threshold": 30,
              "Right Trigger Threshold": 30}
-    lines = ["Player 1 Input:", "  Handler: XInput", "  Device: XInput Pad #1", "  Config:"]
+    lines = ["Player 1 Input:", "  Handler: XInput", '  Device: "XInput Pad #1"', "  Config:"]  # unquoted # = comment
     lines += [f"    {k}: {v}" for k, v in binds.items()]
     return "\n".join(lines) + "\n"
 

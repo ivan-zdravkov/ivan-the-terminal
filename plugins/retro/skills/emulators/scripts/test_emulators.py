@@ -153,7 +153,8 @@ class Controllers(unittest.TestCase):
 
     def test_rpcs3_player_1_on_xinput(self):
         text = emulators.rpcs3_input()
-        self.assertTrue(text.startswith("Player 1 Input:\n  Handler: XInput\n  Device: XInput Pad #1\n"))
+        # quoted: unquoted, YAML reads "#1" as a comment and RPCS3 finds no device 'XInput Pad'
+        self.assertTrue(text.startswith('Player 1 Input:\n  Handler: XInput\n  Device: "XInput Pad #1"\n'))
         self.assertIn("    Cross: A\n", text)
         self.assertIn("    Circle: B\n", text)
 
