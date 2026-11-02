@@ -5,8 +5,10 @@ emulation folder: ROMs, BIOS/keys/firmware, mods, patches and saves stay there; 
   emulators.py install [xenia rpcs3 eden]   latest official builds into EMU_DIR/<name> (keeps settings, caches)
   emulators.py setup   [xenia rpcs3 eden]   saves links, keys + firmware, upscaling/fullscreen, patches, mods
   emulators.py status                       versions, links, what still needs a first run
-  emulators.py games   [--dry-run]          GAME= entries -> Steam + Apollo shortcuts (via add-game, one batch)
+  emulators.py games   [names|systems] [--dry-run]   GAME= entries -> Steam + Apollo (via add-game, one batch)
   emulators.py command <rom>                the emulator command line for a ROM (system from its folder)
+  emulators.py pads                         connected XInput pads and the SDL GUIDs Eden binds to
+  emulators.py pad desk|stream|<guid>       Eden player 1 -> physical pad / Moonlight's virtual pad (Apollo prep)
 
 Config: ~/.config/ivan-the-terminal/emulators.conf (template: config.example). Problems-only output + one summary.
 """
@@ -414,9 +416,122 @@ def setup_rpcs3(p, conf, notes, problems):
         write_if_changed(gy, listed.rstrip("\n") + ("\n" if listed.strip() else "") + "\n".join(add) + "\n")
         notes.append(f"rpcs3: {len(add)} disc folders added to the game list")
     rpcs3_patches(home, conf, games, notes, problems)
+    pad = home / "config" / "input_configs" / "global" / "Default.yml"
+    current = pad.read_text(encoding="utf-8") if pad.is_file() else ""
+    if not re.search(r"^Player 1 Input:\n  Handler: (?!Null|Keyboard)", current, re.M):  # keep a pad set up by hand
+        write_if_changed(pad, rpcs3_input())
+        notes.append("rpcs3: player 1 = XInput Pad #1 (A=Cross, B=Circle, X=Square, Y=Triangle)")
     if not (home / "dev_flash" / "vsh" / "etc" / "version.txt").is_file():
         pup = next(iter(sorted(p.bios.rglob("PS3UPDAT.PUP"))), None)
         problems.append(f'rpcs3: PS3 firmware not installed - run "{exe}" --installfw "{pup or "<PS3UPDAT.PUP>"}"')
+
+
+def rpcs3_input():
+    """RPCS3 input_configs/global/Default.yml: player 1 on the first XInput pad with RPCS3's own XInput defaults
+    (same face-button positions as a DualShock 3). Xbox controllers and Moonlight's virtual pad are both XInput."""
+    binds = {"Left Stick Left": "LS X-", "Left Stick Down": "LS Y-", "Left Stick Right": "LS X+",
+             "Left Stick Up": "LS Y+", "Right Stick Left": "RS X-", "Right Stick Down": "RS Y-",
+             "Right Stick Right": "RS X+", "Right Stick Up": "RS Y+", "Start": "Start", "Select": "Back",
+             "PS Button": "Guide", "Square": "X", "Cross": "A", "Circle": "B", "Triangle": "Y", "Left": "Left",
+             "Down": "Down", "Right": "Right", "Up": "Up", "R1": "RB", "R2": "RT", "R3": "RS", "L1": "LB",
+             "L2": "LT", "L3": "LS", "Left Stick Deadzone": 7849, "Right Stick Deadzone": 8689,
+             "Left Stick Anti-Deadzone": 4259, "Right Stick Anti-Deadzone": 4259, "Left Trigger Threshold": 30,
+             "Right Trigger Threshold": 30}
+    lines = ["Player 1 Input:", "  Handler: XInput", "  Device: XInput Pad #1", "  Config:"]
+    lines += [f"    {k}: {v}" for k, v in binds.items()]
+    return "\n".join(lines) + "\n"
+
+
+# ---------- controllers ----------
+def xinput_pads():
+    """Connected XInput pads as [(slot, 'vvvv:pppp', SDL GUID)]. The GUID is built like SDL2's XInput backend
+    (bus USB, vendor, product, version, 'x', subtype; the name CRC zeroed as Eden does), so it is what Eden binds to."""
+    if not WINDOWS:
+        return []
+    import ctypes
+
+    class CapsEx(ctypes.Structure):
+        _fields_ = [("Type", ctypes.c_ubyte), ("SubType", ctypes.c_ubyte), ("Flags", ctypes.c_ushort),
+                    ("Gamepad", ctypes.c_ubyte * 12), ("Vibration", ctypes.c_ushort * 2),
+                    ("VendorId", ctypes.c_ushort), ("ProductId", ctypes.c_ushort),
+                    ("ProductVersion", ctypes.c_ushort), ("unk1", ctypes.c_ushort), ("unk2", ctypes.c_uint)]
+
+    try:
+        dll = ctypes.WinDLL("xinput1_4.dll")
+        get = ctypes.WINFUNCTYPE(ctypes.c_uint, ctypes.c_uint, ctypes.c_uint, ctypes.c_uint,
+                                 ctypes.POINTER(CapsEx))((108, dll))  # XInputGetCapabilitiesEx (by ordinal)
+    except (OSError, AttributeError):
+        return []
+    pads = []
+    for slot in range(4):
+        c = CapsEx()
+        if get(1, slot, 0, ctypes.byref(c)) == 0:
+            pads.append((slot, f"{c.VendorId:04x}:{c.ProductId:04x}",
+                         sdl_xinput_guid(c.VendorId, c.ProductId, c.ProductVersion, c.SubType)))
+    return pads
+
+
+def sdl_xinput_guid(vendor, product, version, subtype=1):
+    return (struct.pack("<HHHHHHH", 3, 0, vendor, 0, product, 0, version) + bytes([0x78, subtype])).hex()
+
+
+# Moonlight/Apollo's virtual pad: ViGEm Xbox 360 (045e:028e, bcdDevice 0x0114)
+VIRTUAL_X360 = sdl_xinput_guid(0x045E, 0x028E, 0x0114)
+
+
+def eden_pro_controller(guid):
+    """Eden [Controls] values for player 1 as a Pro Controller on an XInput pad, by button position
+    (Xbox A/bottom -> Switch B, B/right -> A, X/left -> Y, Y/top -> X), which is Eden's own SDL default."""
+    def p(**kw):
+        return '"' + ",".join(f"{k}:{v}" for k, v in {"engine": "sdl", "port": 0, "guid": guid, **kw}.items()) + '"'
+
+    buttons = {"a": 1, "b": 0, "x": 3, "y": 2, "lstick": 8, "rstick": 9, "l": 4, "r": 5, "plus": 7, "minus": 6,
+               "home": 10, "slleft": 4, "srleft": 5, "slright": 4, "srright": 5}
+    values = {"player_0_type": "0", "player_0_connected": "true"}
+    values.update({f"player_0_button_{k}": p(button=v) for k, v in buttons.items()})
+    values.update({f"player_0_button_d{d}": p(hat=0, direction=d) for d in ("left", "up", "right", "down")})
+    values.update({"player_0_button_zl": p(axis=2, threshold=0.5, invert="+"),
+                   "player_0_button_zr": p(axis=5, threshold=0.5, invert="+"),
+                   "player_0_lstick": p(axis_x=0, axis_y=1, offset_x="0.000000", offset_y="0.000000",
+                                        invert_x="+", invert_y="+"),
+                   "player_0_rstick": p(axis_x=3, axis_y=4, offset_x="0.000000", offset_y="0.000000",
+                                        invert_x="+", invert_y="+")})
+    out = {}
+    for k, v in values.items():  # Eden ignores a value unless its "\default" flag says it isn't the default
+        out[f"{k}\\default"] = "false"
+        out[k] = v
+    return out
+
+
+def eden_bind_pad(p, guid):
+    cfg = p.eden_user / "config" / "qt-config.ini"
+    text = cfg.read_text(encoding="utf-8") if cfg.is_file() else ""
+    return write_if_changed(cfg, set_ini(text, "Controls", eden_pro_controller(guid)))
+
+
+def desk_pad(conf):
+    """The physical pad's GUID: SWITCH_PAD from the config, else the first connected XInput pad that isn't virtual."""
+    if conf.get("SWITCH_PAD"):
+        return conf["SWITCH_PAD"]
+    return next((g for _, _, g in xinput_pads() if g != VIRTUAL_X360), None)
+
+
+def cmd_pads(args, conf):
+    pads = xinput_pads()
+    for slot, ids, guid in pads:
+        print(f"xinput {slot + 1}  {ids}  {guid}{'  (Moonlight virtual pad)' if guid == VIRTUAL_X360 else ''}")
+    print(f"pads: {len(pads)} connected")
+
+
+def cmd_pad(args, conf):
+    """Point Eden's player 1 at the desk pad, Moonlight's virtual pad (Apollo prep-cmd), or a given GUID."""
+    p = Paths(conf)
+    guid = {"desk": desk_pad(conf), "stream": conf.get("SWITCH_PAD_STREAM") or VIRTUAL_X360}.get(args.which,
+                                                                                               args.which)
+    if not guid or not re.fullmatch(r"[0-9a-f]{32}", guid):
+        die(f"no pad for '{args.which}': connect it, or set SWITCH_PAD to its GUID (see `pads`)")
+    changed = eden_bind_pad(p, guid)
+    print(f"pad: Eden player 1 -> {args.which} {guid}{'' if changed else ' (already)'}")
 
 
 def set_yaml(text, want):
@@ -568,6 +683,20 @@ def setup_eden(p, conf, notes, problems):
     text = add_game_dir(text, (p.roms / "switch").as_posix())
     if write_if_changed(cfg, text):
         notes.append(f"eden: qt-config.ini (docked, {conf['SWITCH_RES_SCALE']}x, game dir {p.roms / 'switch'})")
+    pad = desk_pad(conf)
+    if not pad:
+        problems.append("eden: no controller to bind - connect the pad (or set SWITCH_PAD) and re-run setup")
+    elif needs_pad_binding(text, pad) and eden_bind_pad(p, pad):
+        notes.append(f"eden: player 1 = Pro Controller on {pad} (buttons by position)")
+
+
+def needs_pad_binding(text, pad):
+    """Bind when player 1 has no mapping or is on another SDL pad (e.g. left on Moonlight's after a stream);
+    a hand-made non-SDL mapping (keyboard) is kept."""
+    if "player_0_button_a=" not in text:
+        return True
+    bound = re.search(r"^player_0_button_a=.*guid:([0-9a-f]{32})", text, re.M)
+    return bool(bound) and bound.group(1) != pad
 
 
 def add_game_dir(text, path):
@@ -656,12 +785,17 @@ def cmd_games(args, conf):
             problems.append(f"GAME={g!r}: expected system|rom|name[|sgdb-id]")
             continue
         system, rom, name = parts[:3]
+        if args.names and name not in args.names and system not in args.names:
+            continue
         path = p.roms / system / rom
         if not path.exists():
             problems.append(f"{name}: {path} not found")
             continue
         exe, a = command(p, path)
         job = {"launcher": str(exe), "name": name, "args": a}
+        if SYSTEM_EMULATOR.get(system) == "eden":  # Eden binds pads by GUID: use Moonlight's pad while streaming
+            me = f'"{sys.executable}" -I "{Path(__file__).resolve()}"'
+            job["prep"] = [{"do": f"{me} pad stream", "undo": f"{me} pad desk"}]
         if len(parts) > 3 and parts[3]:
             job["sgdb_id"] = int(parts[3])
         jobs.append(job)
@@ -687,16 +821,20 @@ def main(argv):
             s.add_argument("--force", action="store_true")
     sub.add_parser("status")
     g = sub.add_parser("games")
+    g.add_argument("names", nargs="*", help="only these GAME names or systems (default: all)")
     g.add_argument("--dry-run", action="store_true")
     c = sub.add_parser("command")
     c.add_argument("rom")
+    sub.add_parser("pads")
+    pd = sub.add_parser("pad")
+    pd.add_argument("which", help="desk | stream | <SDL GUID>")
     args = ap.parse_args(argv)
     unknown = [e for e in getattr(args, "emulators", []) if e not in EMULATORS]
     if unknown:
         ap.error(f"unknown emulator(s) {', '.join(unknown)}; choose from {', '.join(EMULATORS)}")
     conf = load_conf()
     {"install": cmd_install, "setup": cmd_setup, "status": cmd_status, "games": cmd_games,
-     "command": cmd_command}[args.cmd](args, conf)
+     "command": cmd_command, "pads": cmd_pads, "pad": cmd_pad}[args.cmd](args, conf)
 
 
 if __name__ == "__main__":

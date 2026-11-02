@@ -366,9 +366,13 @@ def apollo_entry(name, info, cover, virtual_display, existing=None):
         e["virtual-display"] = True
     if info["admin"]:
         e["elevated"] = True
+    prep = [{"do": x.get("do", ""), "undo": x.get("undo", ""), "elevated": bool(x.get("elevated"))}
+            for x in info.get("prep", [])]
     if info["services"]:
         undo = " & ".join(f"sc stop {s} & sc delete {s}" for s in info["services"])
-        e["prep-cmd"] = [{"do": "", "undo": f'cmd /c "{undo}"', "elevated": True}]
+        prep.append({"do": "", "undo": f'cmd /c "{undo}"', "elevated": True})
+    if prep:
+        e["prep-cmd"] = prep
     return e
 
 
@@ -431,6 +435,7 @@ def prepare(job, key):
         return {**g, "name": str(launcher), "skip": "--args needs --name (the folder name is the emulator's)"}
     g["name"] = name = job.get("name") or launcher.parent.name
     g["info"] = info = analyse(launcher, job.get("args", ""))
+    info["prep"] = job.get("prep", [])  # extra Apollo prep-cmds ({do, undo, elevated}), e.g. controller swaps
     if job.get("admin") is not None:
         info["admin"] = job["admin"]
     for d in info["drivers"]:
@@ -629,8 +634,8 @@ def main(argv):
     a.add_argument("launcher", nargs="?")
     a.add_argument("--name")
     a.add_argument("--args", help="arguments after the exe, e.g. an emulator's ROM path (needs --name)")
-    a.add_argument("--batch", help="JSON list of {launcher, name, args, sgdb_id, admin}: one Steam restart, "
-                                   "one UAC prompt")
+    a.add_argument("--batch", help="JSON list of {launcher, name, args, sgdb_id, admin, prep}: one Steam restart, "
+                                   "one UAC prompt (prep = Apollo prep-cmds [{do, undo, elevated}])")
     a.add_argument("--sgdb-id", type=int)
     a.add_argument("--admin", dest="admin", action="store_true", default=None)
     a.add_argument("--no-admin", dest="admin", action="store_false")

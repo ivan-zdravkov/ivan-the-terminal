@@ -21,6 +21,7 @@ Config: `~/.config/ivan-the-terminal/emulators.conf` (template: `config.example`
    `itt run emulators games --dry-run` (check every `note art:` names the right game), then without `--dry-run`.
    One Steam restart and one UAC prompt for the whole batch; ask first if Ivan might be playing or streaming.
 5. `itt run emulators status` shows versions and save links; `itt run emulators command "<rom>"` prints a launch line.
+6. Controllers (setup does this; the pad must be connected or `SWITCH_PAD` set): Xenia reads XInput as is; RPCS3 player 1 = `XInput Pad #1`; Eden player 1 = Pro Controller bound to the pad's SDL GUID, by button position (Xbox A/bottom acts as Switch B). Eden binds by GUID, so Switch games in Apollo run `pad stream` before and `pad desk` after a stream. `itt run emulators pads` lists connected pads and GUIDs; `pad desk|stream|<guid>` switches by hand.
 
 For the folder layout, what each setting does and why, read `README.md`.
 
@@ -35,3 +36,4 @@ For the folder layout, what each setting does and why, read `README.md`.
 - `keys`/firmware errors in Eden: `prod.keys`, `title.keys` and a `Firmware*.zip` must be under `bios/`; re-run setup after replacing them.
 - Game too fast/slow after a 60 fps patch: the patch ties game speed to frame rate; turn it off in the config (`SWITCH_MODS`, `*_PATCH_*`) and re-run setup.
 - Stream shows the desktop: see add-game's Fixes (Apollo virtual display + `ensure_primary`).
+- Switch game ignores the pad: during a stream run `pads`; if Moonlight's pad GUID differs from `pad stream`'s, set `SWITCH_PAD_STREAM` to it and re-run `games switch`. At the desk: `pad desk`. A PS3 game on the wrong pad: XInput slot order, the first connected pad is `#1`.

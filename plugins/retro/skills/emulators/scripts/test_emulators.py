@@ -127,6 +127,37 @@ class Patches(unittest.TestCase):
             self.assertEqual(games["BCES00000"][1]["TITLE"], "Some Collection")
 
 
+class Controllers(unittest.TestCase):
+    def test_guid_matches_sdl_for_an_xinput_pad(self):
+        # SDL 2.32 reported this GUID (name CRC zeroed) for an Xbox Series pad (045e:0b12, version 0) via XInput
+        self.assertEqual(emulators.sdl_xinput_guid(0x045E, 0x0B12, 0), "030000005e040000120b000000007801")
+        self.assertEqual(emulators.VIRTUAL_X360, "030000005e0400008e02000014017801")
+
+    def test_eden_pro_controller_is_positional_and_flagged(self):
+        guid = "030000005e040000120b000000007801"
+        v = emulators.eden_pro_controller(guid)
+        self.assertEqual(v["player_0_button_a"], f'"engine:sdl,port:0,guid:{guid},button:1"')  # right button
+        self.assertEqual(v["player_0_button_b"], f'"engine:sdl,port:0,guid:{guid},button:0"')  # bottom button
+        self.assertIn("hat:0,direction:up", v["player_0_button_dup"])
+        self.assertIn("axis:5,threshold:0.5", v["player_0_button_zr"])
+        self.assertIn("axis_x:3,axis_y:4", v["player_0_rstick"])
+        self.assertEqual(v["player_0_type"], "0")  # Pro Controller
+        self.assertTrue(all(v[k + "\\default"] == "false" for k in v if not k.endswith("\\default")))
+
+    def test_rebind_rules(self):
+        desk, other = "1" * 32, "2" * 32
+        self.assertTrue(emulators.needs_pad_binding("", desk))
+        self.assertFalse(emulators.needs_pad_binding(f'player_0_button_a="engine:sdl,guid:{desk},button:1"', desk))
+        self.assertTrue(emulators.needs_pad_binding(f'player_0_button_a="engine:sdl,guid:{other},button:1"', desk))
+        self.assertFalse(emulators.needs_pad_binding('player_0_button_a="engine:keyboard,code:67"', desk))
+
+    def test_rpcs3_player_1_on_xinput(self):
+        text = emulators.rpcs3_input()
+        self.assertTrue(text.startswith("Player 1 Input:\n  Handler: XInput\n  Device: XInput Pad #1\n"))
+        self.assertIn("    Cross: A\n", text)
+        self.assertIn("    Circle: B\n", text)
+
+
 class Layout(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

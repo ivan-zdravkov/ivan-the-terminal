@@ -66,6 +66,14 @@ class Launcher(unittest.TestCase):
         self.assertEqual(entry["Exe"], f'"{exe}"')
         self.assertEqual(entry["LaunchOptions"], '-f -g "D:\\roms\\switch\\Game.xci"')
 
+    def test_extra_prep_commands_reach_apollo(self):
+        exe = self.dir / "eden.exe"
+        exe.write_bytes(b"MZ")
+        info = addgame.analyse(exe, "-f -g x.nsp")
+        info["prep"] = [{"do": "swap stream", "undo": "swap desk"}]
+        e = addgame.apollo_entry("Game", info, None, True)
+        self.assertEqual(e["prep-cmd"], [{"do": "swap stream", "undo": "swap desk", "elevated": False}])
+
     def test_args_without_name_is_refused(self):
         exe = self.dir / "xenia.exe"
         exe.write_bytes(b"MZ")
