@@ -193,6 +193,39 @@ class Apollo(unittest.TestCase):
         self.assertEqual(addgame.upsert_app(apps, addgame.apollo_entry("H", self.info(), None, True)), "added")
         json.dumps(apps)
 
+    def test_order_groups_pc_then_systems_then_apollo_apps(self):
+        apps = {"apps": [
+            {"name": "Desktop", "uuid": "1"},
+            {"name": "Steam Big Picture", "uuid": "2", "detached": ["steam://open/bigpicture"]},
+            {"name": "Zeta", "uuid": "3", "cmd": '"C:\\Games\\Zeta\\zeta.exe"'},
+            {"name": "Fable", "uuid": "4", "cmd": '"C:\\Emulators\\xenia-canary\\xenia_canary.exe" "D:\\x.iso"'},
+            {"name": "Odyssey", "uuid": "5", "cmd": '"C:\\Emulators\\eden\\eden.exe" -f -g "D:\\o.nsp"'},
+            {"name": "Jak", "uuid": "6", "cmd": '"C:\\Emulators\\rpcs3\\rpcs3.exe" --no-gui "D:\\EBOOT.BIN"'},
+            {"name": "alpha", "uuid": "7", "detached": ["C:\\Games\\a.exe", "--x"]},
+            {"name": "Mario", "uuid": "8", "cmd": "C:\\Emulators\\eden\\eden.exe -g m.nsp"},
+            {"name": "Crash", "uuid": "9", "cmd": '"C:\\Emulators\\duckstation\\duckstation-qt.exe" c.cue'},
+        ]}
+        self.assertFalse(addgame.order_apps(apps, ""))  # no APOLLO_ORDER: untouched
+        self.assertTrue(addgame.order_apps(apps, "pc switch ps3 xbox360 apps"))
+        self.assertEqual([a["name"] for a in apps["apps"]],
+                         ["alpha", "Zeta", "Mario", "Odyssey", "Jak", "Fable", "Crash", "Desktop", "Steam Big Picture"])
+        self.assertFalse(addgame.order_apps(apps, "pc switch ps3 xbox360 apps"))  # stable
+
+    def test_display_index_points_ini_at_stream_display_and_back(self):
+        with tempfile.TemporaryDirectory() as d:
+            ini = Path(d) / "Game.ini"
+            ini.write_text("[Display]\nAdapterVendorID=4098\nDisplayIndex=0\nWindowMode=2\n", encoding="utf-8")
+            args = type("A", (), {"ini": str(ini), "key": "DisplayIndex", "action": "do"})
+            with unittest.mock.patch.object(addgame, "display_index", return_value=2):
+                addgame.cmd_display_index(args, {})
+                self.assertIn("DisplayIndex=2\n", ini.read_text(encoding="utf-8"))
+                addgame.cmd_display_index(args, {})  # a second `do` keeps the desk value
+            args.action = "undo"
+            addgame.cmd_display_index(args, {})
+            self.assertEqual(ini.read_text(encoding="utf-8"),
+                             "[Display]\nAdapterVendorID=4098\nDisplayIndex=0\nWindowMode=2\n")
+            addgame.cmd_display_index(args, {})  # undo without do: no-op
+
 
 class Config(unittest.TestCase):
     def test_overrides_and_comments(self):
