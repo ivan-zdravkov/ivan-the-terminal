@@ -394,7 +394,7 @@ def app_group(app):
     if not cmd.strip() or re.search(r"steam://|\bsteam(\.exe)?\b", cmd, re.I):
         return "apps"
     m = re.match(r'\s*"([^"]+)"|\s*(\S+)', cmd)
-    exe = Path(m.group(1) or m.group(2)).stem.lower()
+    exe = re.split(r"[\\/]", m.group(1) or m.group(2))[-1].rsplit(".", 1)[0].lower()  # Windows paths, any host
     return next((g for k, g in EMULATOR_GROUPS.items() if exe.startswith(k)), "pc")
 
 
