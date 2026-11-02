@@ -72,6 +72,10 @@ class Launcher(unittest.TestCase):
         g = addgame.prepare({"launcher": str(exe), "args": '"D:\\game.iso"'}, key="")
         self.assertIn("--args needs --name", g["skip"])
 
+    def test_powershell_literals_cannot_break_out(self):
+        self.assertEqual(addgame.ps_quote("C:\\Games\\Assassin's Creed"), "'C:\\Games\\Assassin''s Creed'")
+        self.assertEqual(addgame.ps_quote("a\u2019; calc; \u2018b"), "'a\u2019\u2019; calc; \u2018\u2018b'")
+
     def test_plain_batch_needs_no_admin(self):
         bat = self.dir / "start.cmd"
         bat.write_text("@echo off\nstart game.exe\n", encoding="utf-8")

@@ -114,11 +114,16 @@ def expand_all(text, expand):
     return "\n".join(expand(line) if "%" in line else line for line in text.splitlines())
 
 
+def ps_quote(value):
+    """A PowerShell single-quoted literal. PowerShell also treats the typographic quotes as ', so all are doubled."""
+    return "'" + re.sub(r"(['‘’‚‛])", r"\1\1", str(value)) + "'"
+
+
 def signature(path):
     """Authenticode status and signer (Windows); None elsewhere."""
     if not WINDOWS or not Path(path).exists():
         return None
-    ps = (f"$s=Get-AuthenticodeSignature -LiteralPath '{path}'; "
+    ps = (f"$s=Get-AuthenticodeSignature -LiteralPath {ps_quote(path)}; "
           "\"$($s.Status)|$($s.SignerCertificate.Subject -replace ',.*','')\"")
     out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
                          encoding="utf-8").stdout.strip()
@@ -178,6 +183,7 @@ def sgdb_art(name, key, sgdb_id=None):
         sgdb_id, found = hit
     else:
         found = http_json(f"{SGDB}/games/id/{sgdb_id}", auth)["data"]["name"]
+    sgdb_id = int(sgdb_id)  # remote data: ids name files that reach the elevated Apollo step
     art = {"game": (sgdb_id, found)}
 
     def first(kind, **params):
@@ -236,7 +242,7 @@ def gamedb_cover(name):
     if not g.get("cover", {}).get("url"):
         return None
     img = g["cover"]["url"].rsplit("/", 1)[1].rsplit(".", 1)[0]
-    return hit[0], g["name"], f"https://images.igdb.com/igdb/image/upload/t_cover_big_2x/{img}.png"
+    return int(hit[0]), g["name"], f"https://images.igdb.com/igdb/image/upload/t_cover_big_2x/{img}.png"
 
 
 # ---------- Steam shortcuts.vdf (binary VDF) ----------
@@ -390,10 +396,11 @@ def apply_apollo(conf, apps, files, dry):
             shutil.copy(src, dst)
         print(f"wrote {cfg / 'apps.json'}; restart Sunshine/Apollo to load it")
         return True
-    lines = [f"New-Item -ItemType Directory -Force -LiteralPath '{cfg / 'covers'}' | Out-Null",
-             f"Copy-Item -LiteralPath '{cfg / 'apps.json'}' -Destination '{cfg / 'apps.json.bak'}' -Force"]
-    lines += [f"Copy-Item -LiteralPath '{s}' -Destination '{d}' -Force" for s, d in copies]
-    lines += [f"Restart-Service {conf['APOLLO_SERVICE']}", f"'ok' | Set-Content -LiteralPath '{stage / 'done'}'"]
+    q = ps_quote
+    lines = [f"New-Item -ItemType Directory -Force -LiteralPath {q(cfg / 'covers')} | Out-Null",
+             f"Copy-Item -LiteralPath {q(cfg / 'apps.json')} -Destination {q(cfg / 'apps.json.bak')} -Force"]
+    lines += [f"Copy-Item -LiteralPath {q(s)} -Destination {q(d)} -Force" for s, d in copies]
+    lines += [f"Restart-Service {q(conf['APOLLO_SERVICE'])}", f"'ok' | Set-Content -LiteralPath {q(stage / 'done')}"]
     (stage / "apply.ps1").write_text("\n".join(lines) + "\n", encoding="utf-8")
     runner = shutil.which("pwsh") or "powershell"
     subprocess.run([runner, "-NoProfile", "-Command",
