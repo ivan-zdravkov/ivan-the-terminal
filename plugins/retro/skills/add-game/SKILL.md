@@ -19,6 +19,8 @@ Secret: `STEAMGRIDDB_API_KEY`. The script decrypts it in memory from `SGDB_SECRE
 4. Check the `note art:` line names the right game. If it's wrong, re-run with `--name` (the store title) or `--sgdb-id <id>` (from steamgriddb.com/game/<id>).
 5. `itt run add-game list` shows both sides; `itt run add-game remove "<Game>"` removes the shortcut, its grid art and the Apollo entry.
 
+For what is written where, art sources and name matching, read `README.md`.
+
 What it sets up in Apollo: `virtual-display` (unless `APOLLO_VIRTUAL_DISPLAY=0`), so the game streams on its own screen. A launcher that self-elevates (`RunAs`, `net session`) gets `elevated` (override with `--admin` / `--no-admin`). For each service the script creates (`sc create`), Apollo gets an elevated undo step that stops and deletes it, because quitting from Moonlight kills the script before its own cleanup runs.
 
 ## Safety

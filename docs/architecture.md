@@ -41,4 +41,4 @@ Everything that can be is stdlib Python, so the same skills run on Linux and Win
 
 ## Secrets
 
-The overlay uses sops+age. One age key (`~/.config/sops/age/keys.txt`, backed up offline) decrypts everything. Skills consume secrets with `sops exec-env <file> '<cmd>'`, so plaintext never touches disk or the transcript.
+The overlay uses sops+age. One age key (`~/.config/sops/age/keys.txt`, backed up offline) decrypts everything. Skills consume secrets with `sops exec-env <file> '<cmd>'`, so plaintext never touches disk or the transcript. On Windows, `sops exec-env` hands the command to `cmd.exe` with its quotes escaped, which splits quoted paths that contain spaces. A skill that takes such paths (e.g. add-game) reads the secret file's path from its config and decrypts it in memory with `sops -d` instead. The plaintext still never touches disk, arguments or output.
