@@ -231,6 +231,9 @@ if ($ap) {
             # always a virtual Xbox 360 pad: "auto" turns a PlayStation-style client pad into a DualShock 4,
             # which XInput-only games and emulators (RPCS3, Eden's stream binding) never see
             'gamepad' = 'x360'
+            # serve apps in apps.json order to plain Moonlight clients too (Artemis does it anyway); add-game's
+            # APOLLO_ORDER keeps that order grouped
+            'legacy_ordering' = 'enabled'
         }
         $lines = [Collections.Generic.List[string]]([IO.File]::ReadAllLines($apolloConf))
         $c = @()

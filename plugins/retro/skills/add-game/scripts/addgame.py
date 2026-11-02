@@ -5,6 +5,9 @@
                  [--dry-run]
   addgame.py add --batch games.json   many games at once: one Steam restart, one Apollo write (one UAC prompt)
   addgame.py list                     games in Steam shortcuts and the Apollo app list
+  addgame.py order [--dry-run]        sort Apollo's app list into APOLLO_ORDER groups (pc, switch, ps3, ..., apps)
+  addgame.py display-index do|undo <ini> [--key K]   Apollo prep-cmd: point a game that picks its monitor by number
+                                      at the stream's virtual display, and back
   addgame.py remove <name> [--no-steam] [--no-apollo] [--dry-run]
 
 Art: SteamGridDB when STEAMGRIDDB_API_KEY is in the environment or decryptable from SGDB_SECRET, else the official Steam store art
@@ -45,6 +48,7 @@ def load_conf(path=CONF):
         "APOLLO_CONFIG": r"C:\Program Files\Apollo\config",
         "APOLLO_SERVICE": "ApolloService",
         "APOLLO_VIRTUAL_DISPLAY": "1",
+        "APOLLO_ORDER": "",
         "SGDB_SECRET": "",
     }
     if path.is_file():
@@ -376,6 +380,42 @@ def apollo_entry(name, info, cover, virtual_display, existing=None):
     return e
 
 
+# emulator exe (stem, lowercase, prefix match) -> group name used in APOLLO_ORDER
+EMULATOR_GROUPS = {"eden": "switch", "yuzu": "switch", "suyu": "switch", "citron": "switch", "ryujinx": "switch",
+                   "rpcs3": "ps3", "xenia": "xbox360", "pcsx2": "ps2", "duckstation": "ps1", "ppsspp": "psp",
+                   "vita3k": "vita", "cemu": "wiiu", "dolphin": "gamecube", "azahar": "3ds", "citra": "3ds",
+                   "lime3ds": "3ds", "melonds": "ds", "xemu": "xbox"}
+
+
+def app_group(app):
+    """'apps' for Apollo's own entries (Desktop, Steam Big Picture: no command or a Steam URL), the system for an
+    emulator command, else 'pc'."""
+    cmd = app.get("cmd") or " ".join(app.get("detached", []))
+    if not cmd.strip() or re.search(r"steam://|\bsteam(\.exe)?\b", cmd, re.I):
+        return "apps"
+    m = re.match(r'\s*"([^"]+)"|\s*(\S+)', cmd)
+    exe = Path(m.group(1) or m.group(2)).stem.lower()
+    return next((g for k, g in EMULATOR_GROUPS.items() if exe.startswith(k)), "pc")
+
+
+def order_apps(apps, order):
+    """Sort apps.json by group (APOLLO_ORDER, e.g. 'pc switch ps3 xbox360 apps'), then by name. Groups not listed go
+    before 'apps', in name order. Apollo serves this order; Moonlight follows it with legacy ordering on."""
+    groups = order.split()
+    if not groups:
+        return False
+    rank = {g: i for i, g in enumerate(groups)}
+    last = rank.get("apps", len(groups))
+
+    def key(a):
+        g = app_group(a)
+        return rank.get(g, last - 0.5), g, a.get("name", "").casefold()
+
+    before = [a.get("uuid") for a in apps["apps"]]
+    apps["apps"].sort(key=key)
+    return before != [a.get("uuid") for a in apps["apps"]]
+
+
 def upsert_app(apps, entry):
     for i, a in enumerate(apps["apps"]):
         if a.get("name") == entry["name"]:
@@ -536,6 +576,7 @@ def write_apollo(conf, games, dry, problems):
         entry = apollo_entry(g["name"], g["info"], apollo_cover or (existing or {}).get("image-path"),
                              conf["APOLLO_VIRTUAL_DISPLAY"] == "1", existing)
         g["notes"].append(f"apollo: {upsert_app(apps, entry)}")
+    order_apps(apps, conf["APOLLO_ORDER"])
     if not apply_apollo(conf, apps, covers, dry):
         problems.append("apollo: not written")
         return False
@@ -593,6 +634,76 @@ def cmd_list(args, conf):
         print(f"apollo {a.get('name')}  {a.get('cmd') or ' '.join(a.get('detached', []))}")
 
 
+def display_index():
+    """Index of the primary display among the active ones, in Windows' display order (\\\\.\\DISPLAY1, 2, ...).
+    During a stream Apollo makes its virtual display primary, so this is the virtual display's number for games
+    that pick a monitor by index instead of following the primary."""
+    if not WINDOWS:
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    class DisplayDevice(ctypes.Structure):
+        _fields_ = [("cb", wintypes.DWORD), ("DeviceName", ctypes.c_wchar * 32), ("DeviceString", ctypes.c_wchar * 128),
+                    ("StateFlags", wintypes.DWORD), ("DeviceID", ctypes.c_wchar * 128),
+                    ("DeviceKey", ctypes.c_wchar * 128)]
+
+    active, i = [], 0
+    while True:
+        d = DisplayDevice(cb=ctypes.sizeof(DisplayDevice))
+        if not ctypes.windll.user32.EnumDisplayDevicesW(None, i, ctypes.byref(d), 0):
+            break
+        if d.StateFlags & 0x1:  # DISPLAY_DEVICE_ATTACHED_TO_DESKTOP
+            active.append(bool(d.StateFlags & 0x4))  # DISPLAY_DEVICE_PRIMARY_DEVICE
+        i += 1
+    return active.index(True) if True in active else None
+
+
+def set_ini_value(text, key, value):
+    """Replace `key=...` (first match, any section). Returns (new text, old value or None)."""
+    m = re.search(rf"(?m)^({re.escape(key)}\s*=\s*)(.*?)\s*$", text)
+    if not m:
+        return text, None
+    return text[:m.start(2)] + str(value) + text[m.end(2):], m.group(2)
+
+
+def cmd_display_index(args, conf):
+    """Apollo prep-cmd for games that pick their monitor by number: `do` points the game's ini at the primary
+    display (Apollo's virtual one during a stream) and keeps the old value; `undo` puts it back."""
+    ini = Path(args.ini)
+    saved = ini.with_name(ini.name + ".itt-display")
+    text = ini.read_text(encoding="utf-8-sig")
+    if args.action == "do":
+        n = display_index()
+        if n is None:
+            die("no primary display found")
+        new, old = set_ini_value(text, args.key, n)
+        if old is None:
+            die(f"{args.key}= not in {ini}")
+        if not saved.exists():  # a crashed stream mustn't overwrite the desk value with the stream's
+            saved.write_text(old, encoding="utf-8")
+        ini.write_text(new, encoding="utf-8")
+        print(f"{ini.name}: {args.key}={n} (was {old})")
+    elif saved.exists():
+        new, _ = set_ini_value(text, args.key, saved.read_text(encoding="utf-8").strip())
+        ini.write_text(new, encoding="utf-8")
+        saved.unlink()
+        print(f"{ini.name}: {args.key} restored")
+
+
+def cmd_order(args, conf):
+    """Re-sort Apollo's app list by APOLLO_ORDER without adding anything."""
+    if not conf["APOLLO_ORDER"].split():
+        die('set APOLLO_ORDER in the config first, e.g. APOLLO_ORDER="pc switch ps3 xbox360 apps"')
+    apps = read_apps(conf)
+    changed = order_apps(apps, conf["APOLLO_ORDER"])
+    for a in apps["apps"]:
+        print(f"{app_group(a):8} {a.get('name')}")
+    if changed and not apply_apollo(conf, apps, [], args.dry_run):
+        sys.exit(1)
+    print(f"order: {'changed' if changed else 'already in order'}{' (dry-run)' if args.dry_run else ''}")
+
+
 def cmd_remove(args, conf):
     found = False
     if not args.no_steam:
@@ -643,6 +754,12 @@ def main(argv):
     a.add_argument("--no-apollo", action="store_true")
     a.add_argument("--dry-run", action="store_true")
     sub.add_parser("list")
+    o = sub.add_parser("order")
+    o.add_argument("--dry-run", action="store_true")
+    d = sub.add_parser("display-index")
+    d.add_argument("action", choices=["do", "undo"])
+    d.add_argument("ini")
+    d.add_argument("--key", default="DisplayIndex")
     r = sub.add_parser("remove")
     r.add_argument("name")
     r.add_argument("--no-steam", action="store_true")
@@ -650,7 +767,8 @@ def main(argv):
     r.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
     conf = load_conf()
-    {"add": cmd_add, "list": cmd_list, "remove": cmd_remove}[args.cmd](args, conf)
+    {"add": cmd_add, "list": cmd_list, "order": cmd_order, "display-index": cmd_display_index,
+     "remove": cmd_remove}[args.cmd](args, conf)
 
 
 if __name__ == "__main__":

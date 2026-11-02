@@ -36,6 +36,8 @@ itt run add-game add "<launcher>" [--name "<Title>"] [--args "<arguments>"] [--s
                                   [--admin | --no-admin] [--no-steam] [--no-apollo] [--dry-run]
 itt run add-game add --batch games.json [--no-steam] [--no-apollo] [--dry-run]
 itt run add-game list
+itt run add-game order [--dry-run]
+itt run add-game display-index do|undo "<game.ini>" [--key DisplayIndex]
 itt run add-game remove "<Title>" [--no-steam] [--no-apollo] [--dry-run]
 ```
 
@@ -43,7 +45,7 @@ itt run add-game remove "<Title>" [--no-steam] [--no-apollo] [--dry-run]
 |---|---|
 | `--name` | the folder name isn't the game's title, or you want a different display name |
 | `--args` | the launcher needs arguments, e.g. an emulator and its ROM: `add "C:\Emulators\eden\eden.exe" --args '-f -g "D:\roms\switch\Game.nsp"' --name "Game"`. They go into Steam's launch options and Apollo's command. Needs `--name`. |
-| `--batch` | you add several games: a JSON list of `{"launcher", "name", "args", "sgdb_id", "admin"}`. Steam restarts once and Apollo needs one UAC prompt for the whole list. The [emulators](../emulators/README.md) skill uses this. |
+| `--batch` | you add several games: a JSON list of `{"launcher", "name", "args", "sgdb_id", "admin", "prep"}` (`prep`: extra Apollo prep-cmds, `[{"do", "undo", "elevated"}]`). Steam restarts once and Apollo needs one UAC prompt for the whole list. The [emulators](../emulators/README.md) skill uses this. |
 | `--sgdb-id` | the art is for the wrong game; take the id from `steamgriddb.com/game/<id>` |
 | `--admin` / `--no-admin` | the admin detection for scripts got it wrong |
 | `--no-steam` / `--no-apollo` | you want the game on one side only |
@@ -61,6 +63,30 @@ What happens while it runs:
 - **Steam restarts.** Steam rewrites `shortcuts.vdf` when it exits, so a running Steam is closed (`steam -shutdown`), the file is written, and Steam is started again. Don't run it mid-game.
 - **One UAC prompt on Windows.** Apollo's config lives under Program Files, so the write and the service restart run elevated. Restarting Apollo ends any active stream.
 
+### Grouping the Moonlight list
+
+Apollo has no folders, but it serves apps in `apps.json` order, and Moonlight shows that order when Apollo's `legacy_ordering = enabled` is set (Artemis always does). Set `APOLLO_ORDER`, e.g. `"pc switch ps3 xbox360 apps"`, and every write keeps the list grouped, alphabetical within each group. `order` re-sorts without adding anything.
+
+| Group | Apps |
+|---|---|
+| a system (`switch`, `ps3`, `xbox360`, `ps2`, `3ds`, ...) | commands that start a known emulator (Eden/Ryujinx, RPCS3, Xenia, PCSX2, Azahar, ...) |
+| `apps` | Apollo's own entries: Desktop and Steam (no command, or a Steam URL) |
+| `pc` | everything else |
+
+Groups not in `APOLLO_ORDER` come just before `apps`. Apollo's built-in Virtual Desktop entry isn't in `apps.json`, so it stays where Apollo puts it.
+
+### Games that pick their monitor by number
+
+Most games open on the primary display, which Apollo switches to its virtual display during a stream (`ensure_primary`). A few save a monitor *number* in their settings instead (e.g. `DisplayIndex=0` in Assassin's Creed Black Flag Resynced's ini) and open on a physical monitor. For those, add an Apollo prep-cmd through `--batch`:
+
+```json
+[{"launcher": "C:\\Games\\Game\\Game.exe", "name": "Game",
+  "prep": [{"do": "\"<python.exe>\" -I \"<addgame.py>\" display-index do \"<game.ini>\"",
+            "undo": "\"<python.exe>\" -I \"<addgame.py>\" display-index undo \"<game.ini>\""}]}]
+```
+
+`do` writes the primary display's number, in Windows display order, into the ini and keeps your value. `undo` puts your value back after the stream, so the game still opens on your monitor at the desk. Use the real `python.exe` path (`python -c "import sys; print(sys.executable)"`), not the Microsoft Store alias.
+
 ## Safety
 
 - **Read a launch script before adding it.** It runs as you, and as admin if it elevates itself.
@@ -72,6 +98,9 @@ What happens while it runs:
 | Symptom | Fix |
 |---|---|
 | The stream shows your desktop, or the game opens on your physical monitor | Apollo's virtual display driver (SudoVDA) or controller driver (ViGEmBus) is missing; Apollo's `sunshine.log` says which. Also set `dd_configuration_option = ensure_primary` in `sunshine.conf`, so the virtual display becomes primary and games open on it. |
+| The virtual display is primary, but one game still opens on a physical monitor | the game saved a monitor number; see [Games that pick their monitor by number](#games-that-pick-their-monitor-by-number) |
+| Apollo logs `Failed to launch process: 740` | the exe demands admin; re-run with `--admin` (Apollo `elevated`) |
+| Moonlight ignores the app order | set `legacy_ordering = enabled` in Apollo's `sunshine.conf`, check the client's "legacy ordering" toggle in Apollo's client list, then refresh the app list on the client |
 | `no confident art match` | re-run with `--name "<store title>"` or `--sgdb-id <id>` |
 | `steam: no logged-in Steam user yet` | log in to Steam once, then re-run |
 | Art doesn't show in Steam | restart Steam once; it caches the library view |

@@ -3,4 +3,5 @@ STEAM_DIR="C:\Program Files (x86)\Steam"          # Linux: ~/.local/share/Steam
 APOLLO_CONFIG="C:\Program Files\Apollo\config"    # holds apps.json and covers/
 APOLLO_SERVICE="ApolloService"                    # Windows service restarted after writing apps.json
 APOLLO_VIRTUAL_DISPLAY=1                          # 1 = every added game streams on its own virtual display
+APOLLO_ORDER=""                                   # e.g. "pc switch ps3 xbox360 apps": Moonlight list grouped like this
 SGDB_SECRET="~/path/to/secrets/steamgriddb.enc.env"  # sops dotenv with STEAMGRIDDB_API_KEY; empty = Steam store art

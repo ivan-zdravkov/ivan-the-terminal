@@ -19,6 +19,7 @@ Secret: `STEAMGRIDDB_API_KEY`. The script decrypts it in memory from `SGDB_SECRE
    - Apollo writes need admin: Ivan clicks Yes on one UAC prompt, then Apollo restarts (this ends any running stream).
 4. Check the `note art:` line names the right game. If it's wrong, re-run with `--name` (the store title) or `--sgdb-id <id>` (from steamgriddb.com/game/<id>).
 5. `itt run add-game list` shows both sides; `itt run add-game remove "<Game>"` removes the shortcut, its grid art and the Apollo entry.
+6. Grouped Moonlight list: with `APOLLO_ORDER` set (e.g. `"pc switch ps3 xbox360 apps"`) every write sorts apps.json by group (emulator exe -> system, Desktop/Steam -> apps, rest -> pc), then by name; `itt run add-game order` re-sorts. Plain Moonlight clients need Apollo's `legacy_ordering = enabled`.
 
 For what is written where, art sources and name matching, read `README.md`.
 
@@ -26,10 +27,12 @@ What it sets up in Apollo: `virtual-display` (unless `APOLLO_VIRTUAL_DISPLAY=0`)
 
 ## Safety
 - Kernel drivers a script installs are signature-checked; anything not validly signed stops the add (`PROBLEM ... not validly signed`). Tell Ivan the signer from the `note kernel driver` line either way.
-- Never edit the game's own files or configs, and never install addons or mods unless Ivan asks.
+- Never edit the game's own files or configs, and never install addons or mods unless Ivan asks. (`display-index` edits one ini key per stream and restores it; add it only for a game Ivan reported on the wrong screen.)
 
 ## Fixes
 - Game opens on the physical monitor while streaming: the virtual display isn't primary. Apollo needs `dd_configuration_option = ensure_primary` in `sunshine.conf`, and the SudoVDA and ViGEmBus drivers installed (Apollo's log says if either is missing).
+- Virtual display is primary but one game still opens on a physical monitor: it saved a monitor number (e.g. `DisplayIndex` in its ini). Give its Apollo entry a `display-index do/undo "<ini>"` prep-cmd via `--batch` (README: "Games that pick their monitor by number").
+- Apollo log `Failed to launch process: 740`: the exe requires admin; re-add with `--admin --no-steam`.
 - `steam: no logged-in Steam user`: Ivan logs in to Steam once, then re-run.
 - Art missing in Steam after adding: restart Steam once; it caches the library view.
 - SteamGridDB 403: the key is wrong or revoked. `sops -d "$SGDB_SECRET"` must decrypt (never print the key itself).
