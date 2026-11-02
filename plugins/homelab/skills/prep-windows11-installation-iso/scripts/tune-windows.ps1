@@ -134,6 +134,19 @@ Step 'gaming' {
     $dvr = (SetValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR' 'AppCaptureEnabled' 0) -or $dvr
     $dvr = (SetValue 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR' 'AllowGameDVR' 0) -or $dvr
     if ($dvr) { $c += 'Game DVR off' }
+    # Game Bar removed (XboxApps): the Xbox/Guide button and game launches still open ms-gamebar: links,
+    # each one a "pick an app" popup. Unbind the button and give both protocols a silent no-op handler.
+    if (-not (Get-AppxPackage Microsoft.XboxGamingOverlay)) {
+        $gb = SetValue 'HKCU:\Software\Microsoft\GameBar' 'UseNexusForGameBarEnabled' 0
+        foreach ($p in 'ms-gamebar', 'ms-gamingoverlay') {
+            $k = "HKCU:\Software\Classes\$p"
+            $gb = (SetValue $k '(default)' "URL:$p" 'String') -or $gb
+            $gb = (SetValue $k 'URL Protocol' '' 'String') -or $gb
+            $gb = (SetValue $k 'NoOpenWith' '' 'String') -or $gb
+            $gb = (SetValue "$k\shell\open\command" '(default)' "`"$env:SystemRoot\System32\systray.exe`"" 'String') -or $gb
+        }
+        if ($gb) { $c += 'ms-gamebar popups silenced' }
+    }
     # "Optimizations for windowed games": flip-model presentation for DX10/11 games in windowed mode
     $gpu = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
     $cur = "$((Get-ItemProperty $gpu -Name DirectXUserGlobalSettings -ErrorAction SilentlyContinue).DirectXUserGlobalSettings)"
