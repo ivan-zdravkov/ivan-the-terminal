@@ -90,4 +90,5 @@ GAME="switch|Some Game [0100000000000000][v0].nsp|Some Game|<optional steamgridd
 | `Install Files to NAND` says one file failed | try that file again on its own; check it with `setup eden` afterwards |
 | Pokemon Let's Go stuck on "Press a button on the controller you want to use" | it doesn't accept a Pro Controller when docked: add its title id to `SWITCH_HANDHELD` (handheld mode, button throws, 2× = 1440p) and re-run `setup eden` with Eden closed |
 | Switch game doesn't react to the pad | at the desk: `emulators pad desk`. While streaming: run `emulators pads`; if Moonlight's pad shows another GUID, put it in `SWITCH_PAD_STREAM` and re-run `emulators games switch` |
+| Over Moonlight a PS3 or Switch game ignores the pad (Xbox 360 games work) | Apollo made a DualShock 4 (its log: `Gamepad 0 will be DualShock 4 controller`), which isn't XInput. Set `gamepad = x360` in Apollo's `sunshine.conf` (the prep-windows11 skill's Apollo step does) and restart Apollo |
 | PS3 game listens to the wrong pad | RPCS3 uses the first XInput slot; switch the other pad off |
