@@ -103,10 +103,10 @@ def analyse(launcher, args=""):
             binpath = re.search(r'binPath=\s*"?([^"\r\n]+)"?', rest, re.I)
             if binpath:
                 f = expand(binpath.group(1)).replace("%CD%", str(p.parent)).replace("%~dp0", str(p.parent) + "\\")
-                info["drivers"].append(str(Path(f)))
+                info["drivers"].append(str(Path(f.replace("\\", "/"))))  # batch paths use \ on every OS
     target = re.search(r"\bstart\s+(?:/\w+\s+)*(?:\"\"\s+)?\"?([^\"\r\n]+?\.exe)", expand_all(text, expand), re.I)
     if target:
-        info["target"] = str((p.parent / target.group(1).strip().lstrip(".\\/")).resolve())
+        info["target"] = str((p.parent / target.group(1).strip().lstrip(".\\/").replace("\\", "/")).resolve())
     return info
 
 
