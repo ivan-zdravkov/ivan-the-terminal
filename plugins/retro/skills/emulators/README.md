@@ -44,6 +44,18 @@ Config files are edited key by key, so anything else you change in an emulator's
 - A mod only applies to the game version in its `exefs/<version>.pchtxt`. Check that it matches the installed update.
 - Some "60 FPS" patches make the game run faster instead of smoother, because the game ties speed to frame rate. The patch notes usually say so.
 
+## Controllers
+
+Made for Xbox-style pads (XInput), which is also what Moonlight's virtual pad is through Apollo.
+
+| Emulator | Player 1 |
+|---|---|
+| Xenia | any XInput pad, nothing to set |
+| RPCS3 | `XInput Pad #1`, RPCS3's XInput layout: A = ✕, B = ○, X = □, Y = △, Guide = PS |
+| Eden | Pro Controller, buttons **by position**: bottom = B, right = A, left = Y, top = X (the Xbox labels differ, the feel is a Switch pad) |
+
+Eden binds a pad by its SDL GUID, and your physical pad and Moonlight's virtual Xbox 360 pad have different ones. So Switch games in Apollo run `emulators pad stream` before the stream and `emulators pad desk` after it. `itt run emulators pads` lists connected pads with the GUID Eden sees; set `SWITCH_PAD` so the desk pad is known even when it's switched off.
+
 ## Games in Steam and Apollo
 
 ```text
@@ -70,3 +82,5 @@ GAME="switch|Some Game [0100000000000000][v0].nsp|Some Game|<optional steamgridd
 | A 60 fps mod does nothing | the mod is for another game version; see its `.pchtxt` file names |
 | Game runs at double speed | the 60 fps patch ties game speed to frame rate; take it out of the config and re-run setup |
 | Steam art wrong | set the SteamGridDB id as the fourth `GAME=` field |
+| Switch game doesn't react to the pad | at the desk: `emulators pad desk`. While streaming: run `emulators pads`; if Moonlight's pad shows another GUID, put it in `SWITCH_PAD_STREAM` and re-run `emulators games switch` |
+| PS3 game listens to the wrong pad | RPCS3 uses the first XInput slot; switch the other pad off |

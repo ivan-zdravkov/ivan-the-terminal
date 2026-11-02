@@ -13,6 +13,8 @@ SWITCH_MODS="60 ?FPS|Stabilize|1920x1080|Disable Dynamic Resolution|Improved Lev
 SWITCH_MODS_SKIP="Ultrawide|120 ?FPS|Snapshot Quality"
 SWITCH_USER="Player"                   # name for the Eden profile that owns saves/switch
 # SWITCH_PROFILE=""                    # only if saves/switch holds several profile UUIDs
+# SWITCH_PAD=""                        # SDL GUID of the pad Eden binds at the desk (`pads`); empty = first connected
+# SWITCH_PAD_STREAM=""                 # pad while streaming; empty = Moonlight's virtual Xbox 360 pad
 # XENIA_PROFILE=""                     # only if saves/xbox360 holds several profile XUIDs
 
 # Game patches to turn on (regex on the patch name), per Xbox 360 title id / PS3 serial
