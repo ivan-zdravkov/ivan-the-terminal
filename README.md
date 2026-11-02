@@ -65,6 +65,8 @@ flowchart LR
 | [career](plugins/career) | [`job-digest`](plugins/career/skills/job-digest) | headless weekday run, no sending; ranked digest in a phone app with push and marks | ✅ |
 | [retro](plugins/retro) | [`rom-library`](plugins/retro/skills/rom-library) | audit the ROM library: CHD/RVZ, playlists, 50 Hz, duplicates | ✅ |
 |  | [`rom-sync`](plugins/retro/skills/rom-sync) | mirror systems to a device over adb or to an SD card | ✅ |
+|  | [`add-game`](plugins/retro/skills/add-game/README.md) | a game's launcher → Steam non-Steam game + Apollo/Sunshine app, both with SteamGridDB art; streams on its own virtual display | ✅ |
+|  | [`emulators`](plugins/retro/skills/emulators/README.md) | Xbox 360 / PS3 / Switch emulators (Xenia Canary, RPCS3, Eden) wired to one emulation folder: saves stay there, keys + firmware, 1440p, 60 fps patches and mods, games into Steam + Apollo | ✅ |
 | [health](plugins/health) | [`daily-coach`](plugins/health/skills/daily-coach) | ring/Apple Health → a tiny gamified daily plan in a phone app with push, check-ins, XP, trends, seasonal recipe | ✅ |
 | kitchen | chef | seasonal, locally available recipes, pantry-aware ([roadmap](docs/roadmap.md)) | 📝 ToDo |
 | training | training buddy | progressive overload plans and calendar events ([roadmap](docs/roadmap.md)) | 📝 ToDo |
