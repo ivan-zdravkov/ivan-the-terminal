@@ -8,6 +8,7 @@
 #   -StoreApps     Microsoft Store ids installed with winget
 #   -Power         words: always-on (no sleep/hibernate), screen:<min> (display off), lock:<min> (idle lock), wol
 #   -Apollo        words: headless (virtual display at the client's resolution + fps), isolated (only that display)
+#   -Keyboard      words: capslock (Caps Lock switches keyboard layout, Shift+Caps Lock is Caps Lock; AutoHotkey)
 #   -Logon         only the per-logon part (tray icons, autostart); what the scheduled task runs
 param(
     [string]$Taskbar = 'center autohide alltray',
@@ -17,6 +18,7 @@ param(
     [string]$StoreApps = '',
     [string]$Power = '',
     [string]$Apollo = '',
+    [string]$Keyboard = '',
     [switch]$Logon,
     [string]$Log = ''
 )
@@ -25,6 +27,7 @@ if ($Log) { Start-Transcript -Path $Log -Append | Out-Null }
 $report = New-Object System.Collections.Generic.List[string]
 $home_ = Join-Path $env:ProgramFiles 'ivan-the-terminal'  # admin-only: the elevated logon task runs from here
 $task = 'ivan-the-terminal desktop'
+$kbTask = 'ivan-the-terminal keyboard'
 $words = $Taskbar.ToLower().Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
 $explorerChanged = $false
 
@@ -249,6 +252,48 @@ if ($ap) {
         [IO.File]::WriteAllLines($apolloConf, $lines, (New-Object Text.UTF8Encoding $false))
         Restart-Service ApolloService
         ($c -join ', ') + '; restarted'
+    }
+}
+
+# ---- keyboard ---------------------------------------------------------------------------------
+$kb = $Keyboard.ToLower().Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
+if ($kb -contains 'capslock') {
+    Step 'keyboard' {
+        # Windows' layout hotkeys can only be Alt+Shift, Ctrl+Shift or the grave accent, so an AutoHotkey script does it.
+        # It runs elevated from an admin-only folder: hooks in a normal process miss keys typed into admin windows.
+        $ahk = Join-Path $env:ProgramFiles 'AutoHotkey\v2\AutoHotkey64.exe'
+        $c = @()
+        if (-not (Test-Path $ahk)) {
+            if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return 'FAILED: winget not available yet; re-run tune later' }
+            & winget install --id AutoHotkey.AutoHotkey --exact --scope machine --silent --accept-package-agreements --accept-source-agreements --disable-interactivity *> $null
+            if (-not (Test-Path $ahk)) { return "FAILED: AutoHotkey install (winget exit $LASTEXITCODE)" }
+            $c += 'AutoHotkey installed'
+        }
+        New-Item -ItemType Directory -Force $home_ | Out-Null
+        $file = Join-Path $home_ 'capslock-layout.ahk'
+        $text = @'
+; ivan-the-terminal (tune-windows.ps1 -Keyboard capslock): Caps Lock = next keyboard layout, Shift+Caps Lock = Caps Lock
+#Requires AutoHotkey v2.0
+#SingleInstance Force
+#NoTrayIcon
+CapsLock::try PostMessage(0x50, 2, 0, , "A")  ; WM_INPUTLANGCHANGEREQUEST, INPUTLANGCHANGE_FORWARD: what Alt+Shift does
++CapsLock::SetCapsLockState(GetKeyState("CapsLock", "T") ? "Off" : "On")
+'@
+        $changed = -not (Test-Path $file) -or ([IO.File]::ReadAllText($file) -ne $text)
+        if ($changed) { [IO.File]::WriteAllText($file, $text, (New-Object Text.UTF8Encoding $false)) }
+        $t = Get-ScheduledTask -TaskName $kbTask -ErrorAction SilentlyContinue
+        if (-not $t -or $t.Actions[0].Execute -ne $ahk) {
+            $action = New-ScheduledTaskAction -Execute $ahk -Argument "`"$file`""
+            $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+            $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Highest
+            # no time limit, and normal priority (tasks default to below normal; a keyboard hook must not lag)
+            $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 4
+            $t = Register-ScheduledTask -TaskName $kbTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
+            $changed = $true
+            $c += 'Caps Lock switches layout (logon task)'
+        }
+        if ($changed -or $t.State -ne 'Running') { Stop-ScheduledTask -TaskName $kbTask; Start-ScheduledTask -TaskName $kbTask }
+        if ($c) { $c -join ', ' }
     }
 }
 

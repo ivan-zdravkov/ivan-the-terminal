@@ -32,7 +32,7 @@ Everything is built in `~/.local/state/ivan-the-terminal/prep-windows11-installa
 
 ## After the install
 - `restore-keys.ps1` copies `KEYS_VOLUME:\KEYS_DIR\ssh` to `~\.ssh` (owner-only ACL) and `age\keys.txt` to `%APPDATA%\sops\age\`. It turns on the OpenSSH agent and points Git at Windows OpenSSH with your name and email. If the drive was unplugged at first logon, plug it in and run `C:\Setup\Installers\restore-keys.ps1`.
-- After the apps, `tune-windows.ps1` applies the tune-up from the conf (`TASKBAR`, `TASKBAR_PINS`, `AUTOSTART_OFF`, `DEBLOAT`, `STORE_APPS`): taskbar layout and pins, every tray icon shown, launchers kept from autostarting, Edge / Fax and Scan / Phone Link's host removed, gaming settings, .NET 3.5. A logon task (`ivan-the-terminal desktop`) keeps new tray icons visible and launchers off. On a running PC: `tune` (one UAC prompt; output from the elevated window is printed afterwards). Details: `references/answer-file.md`.
+- After the apps, `tune-windows.ps1` applies the tune-up from the conf (`TASKBAR`, `TASKBAR_PINS`, `AUTOSTART_OFF`, `DEBLOAT`, `STORE_APPS`, `POWER`, `APOLLO`, `KEYBOARD`): taskbar layout and pins, every tray icon shown, launchers kept from autostarting, Edge / Fax and Scan / Phone Link's host removed, gaming settings, Caps Lock as the layout switch, .NET 3.5. A logon task (`ivan-the-terminal desktop`) keeps new tray icons visible and launchers off. On a running PC: `tune` (one UAC prompt; output from the elevated window is printed afterwards). Details: `references/answer-file.md`.
 - Then follow `new-machine`: `ssh-add`, `gh auth login`, clone ivan-the-terminal, `itt bootstrap` (with `toolchain` on the stick it only links things up).
 
 ## Fixes
