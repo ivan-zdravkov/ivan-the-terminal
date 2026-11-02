@@ -75,6 +75,7 @@ DEFAULTS = {
     "STORE_APPS": "",
     "POWER": "",
     "APOLLO": "",
+    "KEYBOARD": "",
 }
 
 # The debloat profile: every option of the generator we set (see references/answer-file.md).
@@ -458,7 +459,8 @@ def ps_quote(s):
 def tune_call(conf, script, log=None):
     """PowerShell call of tune-windows.ps1 (SCRIPT: a PowerShell path expression) with the conf's settings."""
     args = [("Taskbar", "TASKBAR"), ("Pins", "TASKBAR_PINS"), ("AutostartOff", "AUTOSTART_OFF"),
-            ("Debloat", "DEBLOAT"), ("StoreApps", "STORE_APPS"), ("Power", "POWER"), ("Apollo", "APOLLO")]
+            ("Debloat", "DEBLOAT"), ("StoreApps", "STORE_APPS"), ("Power", "POWER"), ("Apollo", "APOLLO"),
+            ("Keyboard", "KEYBOARD")]
     call = f"& {script}" + "".join(f" -{p} {ps_quote(conf[k])}" for p, k in args)
     return call + (f" -Log {ps_quote(log)}" if log else "")
 
@@ -781,7 +783,8 @@ def cmd_plan(conf, a):
     say(f"removed: {conf['REMOVE']}; after the apps: {conf['DEBLOAT'] or 'nothing'}")
     say(f"taskbar: {conf['TASKBAR'] or 'unchanged'}; pins: {conf['TASKBAR_PINS'] or 'unchanged'}; "
         f"autostart off: {conf['AUTOSTART_OFF'] or '-'}; Store apps: {conf['STORE_APPS'] or '-'}")
-    say(f"power: {conf['POWER'] or 'Windows defaults'}; Apollo: {conf['APOLLO'] or 'defaults'}")
+    say(f"power: {conf['POWER'] or 'Windows defaults'}; Apollo: {conf['APOLLO'] or 'defaults'}; "
+        f"keyboard: {conf['KEYBOARD'] or 'Windows defaults'}")
     say(f"keys: {conf['KEYS_VOLUME'] + ':' + chr(92) + conf['KEYS_DIR'] if conf['KEYS_VOLUME'] else 'not restored'}"
         f"; git identity: {conf['GIT_NAME'] or '-'} <{conf['GIT_EMAIL'] or '-'}>")
     say(f"secrets in env: WIN11_PASSWORD {'set' if 'WIN11_PASSWORD' in os.environ else 'MISSING'}, "

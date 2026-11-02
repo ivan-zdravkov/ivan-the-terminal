@@ -25,3 +25,4 @@ DEBLOAT="Edge FaxScan CrossDevice"  # Edge (EEA only; WebView2 stays), Windows F
 STORE_APPS=""                       # Microsoft Store ids, e.g. "9WZDNCRFJ3PV" (Windows Scan)
 POWER=""                            # always-on (never sleep/hibernate), screen:<min>, lock:<min>, wol; e.g. "always-on screen:15 lock:30 wol"
 APOLLO=""                           # with apollo in APPS: headless (virtual display at the client's resolution + fps), isolated
+KEYBOARD=""                         # capslock: Caps Lock switches keyboard layout (US -> BG -> US), Shift+Caps Lock is Caps Lock
