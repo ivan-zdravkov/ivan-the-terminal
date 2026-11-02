@@ -15,6 +15,9 @@ SWITCH_USER="Player"                   # name for the Eden profile that owns sav
 # SWITCH_PROFILE=""                    # only if saves/switch holds several profile UUIDs
 # SWITCH_PAD=""                        # SDL GUID of the pad Eden binds at the desk (`pads`); empty = first connected
 # SWITCH_PAD_STREAM=""                 # pad while streaming; empty = Moonlight's virtual Xbox 360 pad
+# SWITCH_HANDHELD=""                   # title ids to run in handheld mode: games that refuse a Pro Controller
+                                       # when docked (Pokemon Let's Go Pikachu 010003F003A34000 / Eevee 0100187003A36000)
+# SWITCH_HANDHELD_RES_SCALE=2          # handheld 720p x2 = 1440p
 # XENIA_PROFILE=""                     # only if saves/xbox360 holds several profile XUIDs
 
 # Game patches to turn on (regex on the patch name), per Xbox 360 title id / PS3 serial
