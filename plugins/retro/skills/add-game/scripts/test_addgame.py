@@ -57,6 +57,21 @@ class Launcher(unittest.TestCase):
                                           "set EXENAME=game.exe\nstart /wait .\\bin\\%EXENAME% -arg"), encoding="utf-8")
         self.assertEqual(addgame.analyse(bat)["target"], str((self.dir / "bin" / "game.exe").resolve()))
 
+    def test_exe_with_args_for_emulators(self):
+        exe = self.dir / "eden.exe"
+        exe.write_bytes(b"MZ")
+        info = addgame.analyse(exe, '-f -g "D:\\roms\\switch\\Game.xci"')
+        self.assertEqual(info["apollo_cmd"], f'"{exe}" -f -g "D:\\roms\\switch\\Game.xci"')
+        _, entry = addgame.steam_entry("Game", exe, args=info["args"])
+        self.assertEqual(entry["Exe"], f'"{exe}"')
+        self.assertEqual(entry["LaunchOptions"], '-f -g "D:\\roms\\switch\\Game.xci"')
+
+    def test_args_without_name_is_refused(self):
+        exe = self.dir / "xenia.exe"
+        exe.write_bytes(b"MZ")
+        g = addgame.prepare({"launcher": str(exe), "args": '"D:\\game.iso"'}, key="")
+        self.assertIn("--args needs --name", g["skip"])
+
     def test_plain_batch_needs_no_admin(self):
         bat = self.dir / "start.cmd"
         bat.write_text("@echo off\nstart game.exe\n", encoding="utf-8")
@@ -82,6 +97,11 @@ class Matching(unittest.TestCase):
     def test_plain_title_beats_dlc(self):
         results = {"Forza Horizon 6": [(8, "Forza Horizon 6 VIP Membership"), (6, "Forza Horizon 6")]}
         self.assertEqual(addgame.best_match("Forza Horizon 6", self.search(results)), (6, "Forza Horizon 6"))
+
+    def test_accents_fold(self):
+        results = {"Pokemon: Let's Go, Pikachu!": [(10, "Pokémon: Let's Go, Pikachu!"), (11, "Pokémon Go")]}
+        self.assertEqual(addgame.best_match("Pokemon: Let's Go, Pikachu!", self.search(results)),
+                         (10, "Pokémon: Let's Go, Pikachu!"))
 
     def test_no_confident_match_is_none(self):
         results = {"Totally Unknown Game": [(9, "Something Else")]}

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Add a PC game (exe/bat/cmd) to Steam as a non-Steam game and to Apollo/Sunshine, both with art.
 
-  addgame.py add <launcher> [--name N] [--sgdb-id ID] [--admin|--no-admin] [--no-steam] [--no-apollo] [--dry-run]
+  addgame.py add <launcher> [--name N] [--args A] [--sgdb-id ID] [--admin|--no-admin] [--no-steam] [--no-apollo]
+                 [--dry-run]
+  addgame.py add --batch games.json   many games at once: one Steam restart, one Apollo write (one UAC prompt)
   addgame.py list                     games in Steam shortcuts and the Apollo app list
   addgame.py remove <name> [--no-steam] [--no-apollo] [--dry-run]
 
@@ -18,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 import uuid
@@ -76,15 +79,16 @@ def sgdb_key(conf):
 
 
 # ---------- launcher analysis ----------
-def analyse(launcher):
+def analyse(launcher, args=""):
     """What Apollo/Steam need to know about a launcher: command line, admin, services it creates, drivers."""
     p = Path(launcher)
     info = {"path": str(p), "dir": str(p.parent), "kind": p.suffix.lower(), "admin": False,
-            "services": [], "drivers": []}
+            "services": [], "drivers": [], "args": args}
+    tail = f" {args}" if args else ""
     if info["kind"] == ".exe":
-        info["apollo_cmd"] = f'"{p}"'
+        info["apollo_cmd"] = f'"{p}"{tail}'
         return info
-    info["apollo_cmd"] = f'cmd /c ""{p}""'
+    info["apollo_cmd"] = f'cmd /c ""{p}"{tail}"'
     text = p.read_text(encoding="utf-8", errors="replace")
     info["admin"] = bool(re.search(r"-Verb\s+RunAs|net\s+session|runas\s", text, re.I))
     variables = {k.lower(): v.strip() for k, v in re.findall(r"^\s*set\s+\"?(\w+)=([^\"\r\n]*)\"?", text, re.I | re.M)}
@@ -135,7 +139,9 @@ def download(url, dest):
 
 
 def words(s):
-    """Significant words: lowercase alphanumerics longer than 2 chars, or digits (sequel numbers matter)."""
+    """Significant words: lowercase alphanumerics longer than 2 chars, or digits (sequel numbers matter).
+    Accents fold first, so 'Pokémon' matches 'Pokemon'."""
+    s = "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
     return [w for w in re.findall(r"[a-z0-9]+", s.lower()) if len(w) > 2 or w.isdigit()]
 
 
@@ -320,12 +326,12 @@ def start_steam(steam_dir):
     subprocess.Popen([steam_exe(steam_dir)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **flags)
 
 
-def steam_entry(name, launcher, icon=""):
+def steam_entry(name, launcher, icon="", args=""):
     p = Path(launcher)
     exe = f'"{p}"'
     return shortcut_id(exe, name), {
         "appid": signed(shortcut_id(exe, name)), "AppName": name, "Exe": exe, "StartDir": f'"{p.parent}\\"',
-        "icon": icon or str(p), "ShortcutPath": "", "LaunchOptions": "", "IsHidden": 0, "AllowDesktopConfig": 1,
+        "icon": icon or str(p), "ShortcutPath": "", "LaunchOptions": args, "IsHidden": 0, "AllowDesktopConfig": 1,
         "AllowOverlay": 1, "OpenVR": 0, "Devkit": 0, "DevkitGameID": "", "DevkitOverrideAppID": 0,
         "LastPlayTime": 0, "FlatpakAppID": "", "tags": {},
     }
@@ -406,130 +412,171 @@ def read_apps(conf):
 
 
 # ---------- commands ----------
-def cmd_add(args, conf):
-    launcher = Path(args.launcher).resolve()
+def prepare(job, key):
+    """Resolve one game: launcher analysis, driver checks, art downloads. Returns a dict; 'skip' = don't write."""
+    launcher = Path(job["launcher"]).resolve()
+    g = {"launcher": launcher, "problems": [], "notes": [], "files": {}, "cover": None, "cover_src": None}
     if not launcher.is_file():
-        die(f"no such file: {launcher}")
+        return {**g, "name": job.get("name") or str(launcher), "skip": f"no such file: {launcher}"}
     if launcher.suffix.lower() not in LAUNCHERS:
-        die(f"launcher must be one of {sorted(LAUNCHERS)}")
-    name = args.name or launcher.parent.name
-    info = analyse(launcher)
-    if args.admin is not None:
-        info["admin"] = args.admin
-    problems, notes = [], []
+        return {**g, "name": job.get("name") or str(launcher), "skip": f"launcher must be one of {sorted(LAUNCHERS)}"}
+    if job.get("args") and not job.get("name"):
+        return {**g, "name": str(launcher), "skip": "--args needs --name (the folder name is the emulator's)"}
+    g["name"] = name = job.get("name") or launcher.parent.name
+    g["info"] = info = analyse(launcher, job.get("args", ""))
+    if job.get("admin") is not None:
+        info["admin"] = job["admin"]
     for d in info["drivers"]:
         sig = signature(d)
-        notes.append(f"kernel driver {d}: {sig or 'signature unknown'}")
+        g["notes"].append(f"kernel driver {d}: {sig or 'signature unknown'}")
         if sig and not sig.startswith("Valid"):
-            problems.append(f"kernel driver {d} is not validly signed ({sig}); not added - check it first")
+            g["skip"] = f"kernel driver {d} is not validly signed ({sig}); not added - check it first"
     if info.get("target"):
-        notes.append(f"launches {Path(info['target']).name}: {signature(info['target']) or 'signature unknown'}")
-    if problems:
-        print("\n".join("PROBLEM " + p for p in problems))
-        sys.exit(1)
+        g["notes"].append(f"launches {Path(info['target']).name}: {signature(info['target']) or 'signature unknown'}")
+    if g.get("skip"):
+        return g
 
     work = Path(tempfile.mkdtemp(prefix="add-game-art-"))
-    key, why = sgdb_key(conf)
-    if why:
-        problems.append(why)
     art, source = None, None
     try:
         if key:
-            art, source = sgdb_art(name, key, args.sgdb_id), "SteamGridDB"
+            art, source = sgdb_art(name, key, job.get("sgdb_id")), "SteamGridDB"
         if not art:
             art, source = store_art(name), "Steam store"
     except Exception as e:
-        problems.append(f"art lookup failed: {e}")
-    if not key:
-        notes.append("no SteamGridDB key: using Steam store art (no logos/icons)")
-    files = {}
+        g["problems"].append(f"art lookup failed: {e}")
     for slot in ("portrait", "banner", "hero", "logo", "icon"):
         url = (art or {}).get(slot)
         if url:
             ext = Path(urllib.parse.urlparse(url).path).suffix or ".png"
             try:
-                files[slot] = download(url, work / f"{slot}{ext}")
+                g["files"][slot] = download(url, work / f"{slot}{ext}")
             except Exception as e:
-                problems.append(f"{slot} art download failed: {e}")
-    cover, cover_src = None, None
+                g["problems"].append(f"{slot} art download failed: {e}")
     if art and art.get("portrait_png"):
-        cover, cover_src = download(art["portrait_png"], work / f"sgdb_{art['game'][0]}.png"), "SteamGridDB"
+        g["cover"], g["cover_src"] = download(art["portrait_png"], work / f"sgdb_{art['game'][0]}.png"), "SteamGridDB"
     else:
         hit = gamedb_cover(name)
         if hit:
-            cover, cover_src = download(hit[2], work / f"igdb_{hit[0]}.png"), f"IGDB '{hit[1]}'"
+            g["cover"], g["cover_src"] = download(hit[2], work / f"igdb_{hit[0]}.png"), f"IGDB '{hit[1]}'"
     if art:
-        notes.append(f"art: {source} '{art['game'][1]}' (id {art['game'][0]}): {', '.join(sorted(files)) or 'none'}")
+        g["notes"].append(f"art: {source} '{art['game'][1]}' (id {art['game'][0]}): "
+                          f"{', '.join(sorted(g['files'])) or 'none'}")
     else:
-        print(f"PROBLEM no confident art match for '{name}'; nothing written. Re-run with --name '<store title>' "
-              "or --sgdb-id <id> (steamgriddb.com/game/<id>)")
-        sys.exit(1)
+        g["skip"] = (f"no confident art match for '{name}'; nothing written. Re-run with --name '<store title>' "
+                     "or --sgdb-id <id> (steamgriddb.com/game/<id>)")
+    return g
 
-    if not args.no_steam:
-        users = steam_users(conf["STEAM_DIR"])
-        if not users:
-            problems.append("steam: no logged-in Steam user yet - log in once, then re-run")
-        else:
-            was_running = steam_running()
-            if was_running and not args.dry_run and not stop_steam(conf["STEAM_DIR"]):
-                problems.append("steam: didn't close within 60s; nothing written")
-            else:
-                for user in users:
-                    cfg = user / "config"
-                    vdf = cfg / "shortcuts.vdf"
-                    sc = read_shortcuts(vdf)
-                    grid = cfg / "grid"
-                    uid, entry = steam_entry(name, launcher)
-                    stored = upsert_shortcut(sc, name, entry)
-                    uid = stored["appid"] & 0xFFFFFFFF
-                    if "icon" in files:
-                        stored["icon"] = str(grid / f"{uid}_icon{files['icon'].suffix}")
-                    if args.dry_run:
-                        print(f"dry-run: steam user {user.name}: {name} -> {uid}")
-                        continue
-                    cfg.mkdir(exist_ok=True)
-                    grid.mkdir(exist_ok=True)
-                    if vdf.is_file():
-                        shutil.copy(vdf, vdf.with_suffix(".vdf.bak"))
-                    write_shortcuts(vdf, sc)
-                    for slot, suffix in (("portrait", "p"), ("banner", ""), ("hero", "_hero"), ("logo", "_logo"),
-                                         ("icon", "_icon")):
-                        if slot in files:
-                            for old in grid.glob(f"{uid}{suffix}.*"):
-                                old.unlink()
-                            shutil.copy(files[slot], grid / f"{uid}{suffix}{files[slot].suffix}")
-                if was_running and not args.dry_run:
-                    start_steam(conf["STEAM_DIR"])
 
-    apollo_cover = None
-    if not args.no_apollo:
-        apps = read_apps(conf)
-        existing = next((a for a in apps["apps"] if a.get("name") == name), None)
-        if cover:
-            apollo_cover = Path(conf["APOLLO_CONFIG"]) / "covers" / cover.name
-        entry = apollo_entry(name, info, apollo_cover or (existing or {}).get("image-path"),
+def write_steam(conf, games, dry, problems):
+    """All games into every Steam user's shortcuts.vdf + grid art, with a single Steam stop/start."""
+    users = steam_users(conf["STEAM_DIR"])
+    if not users:
+        problems.append("steam: no logged-in Steam user yet - log in once, then re-run")
+        return False
+    was_running = steam_running()
+    if was_running and not dry and not stop_steam(conf["STEAM_DIR"]):
+        problems.append("steam: didn't close within 60s; nothing written")
+        return False
+    for user in users:
+        cfg = user / "config"
+        vdf = cfg / "shortcuts.vdf"
+        sc = read_shortcuts(vdf)
+        grid = cfg / "grid"
+        art = []
+        for g in games:
+            _, entry = steam_entry(g["name"], g["launcher"], args=g["info"]["args"])
+            stored = upsert_shortcut(sc, g["name"], entry)
+            uid = stored["appid"] & 0xFFFFFFFF
+            if "icon" in g["files"]:
+                stored["icon"] = str(grid / f"{uid}_icon{g['files']['icon'].suffix}")
+            art.append((uid, g["files"]))
+            if dry:
+                print(f"dry-run: steam user {user.name}: {g['name']} -> {uid}")
+        if dry:
+            continue
+        cfg.mkdir(exist_ok=True)
+        grid.mkdir(exist_ok=True)
+        if vdf.is_file():
+            shutil.copy(vdf, vdf.with_suffix(".vdf.bak"))
+        write_shortcuts(vdf, sc)
+        for uid, files in art:
+            for slot, suffix in (("portrait", "p"), ("banner", ""), ("hero", "_hero"), ("logo", "_logo"),
+                                 ("icon", "_icon")):
+                if slot in files:
+                    for old in grid.glob(f"{uid}{suffix}.*"):
+                        old.unlink()
+                    shutil.copy(files[slot], grid / f"{uid}{suffix}{files[slot].suffix}")
+    if was_running and not dry:
+        start_steam(conf["STEAM_DIR"])
+    return True
+
+
+def write_apollo(conf, games, dry, problems):
+    """All games into apps.json with one elevated write + Apollo restart."""
+    apps = read_apps(conf)
+    covers = []
+    for g in games:
+        existing = next((a for a in apps["apps"] if a.get("name") == g["name"]), None)
+        apollo_cover = Path(conf["APOLLO_CONFIG"]) / "covers" / g["cover"].name if g["cover"] else None
+        if g["cover"]:
+            covers.append(g["cover"])
+        entry = apollo_entry(g["name"], g["info"], apollo_cover or (existing or {}).get("image-path"),
                              conf["APOLLO_VIRTUAL_DISPLAY"] == "1", existing)
-        action = upsert_app(apps, entry)
-        if not apply_apollo(conf, apps, [cover] if cover else [], args.dry_run):
-            problems.append("apollo: not written")
-        else:
-            notes.append(f"apollo: {action}")
+        g["notes"].append(f"apollo: {upsert_app(apps, entry)}")
+    if not apply_apollo(conf, apps, covers, dry):
+        problems.append("apollo: not written")
+        return False
+    return True
 
-    for n in notes:
-        print("note", n)
+
+def cmd_add(args, conf):
+    if args.batch:
+        jobs = json.loads(Path(args.batch).read_text(encoding="utf-8"))
+    elif args.launcher:
+        jobs = [{"launcher": args.launcher, "name": args.name, "args": args.args or "", "sgdb_id": args.sgdb_id,
+                 "admin": args.admin}]
+    else:
+        die("give a launcher or --batch <file.json>")
+    problems = []
+    key, why = sgdb_key(conf)
+    if why:
+        problems.append(why)
+    games = [prepare(job, key) for job in jobs]
+    ok = [g for g in games if not g.get("skip")]
+    steam_ok = apollo_ok = False
+    if ok and not args.no_steam:
+        steam_ok = write_steam(conf, ok, args.dry_run, problems)
+    if ok and not args.no_apollo:
+        apollo_ok = write_apollo(conf, ok, args.dry_run, problems)
+
+    if not key:
+        print("note no SteamGridDB key: using Steam store art (no logos/icons)")
+    for g in games:
+        for n in g["notes"]:
+            print("note", f"{g['name']}: {n}" if len(games) > 1 else n)
+        for p in g["problems"] + ([g["skip"]] if g.get("skip") else []):
+            print("PROBLEM", f"{g['name']}: {p}" if len(games) > 1 else p)
     for p in problems:
         print("PROBLEM", p)
-    flags = [f for f, on in (("admin", info["admin"]), ("driver-undo", bool(info["services"]))) if on]
-    print(f"{name}: steam={'skip' if args.no_steam else 'ok'} apollo={'skip' if args.no_apollo else 'ok'} "
-          f"cover={cover_src or 'none'}{' [' + ','.join(flags) + ']' if flags else ''}"
-          f"{' (dry-run)' if args.dry_run else ''}{' - with problems' if problems else ''}")
-    sys.exit(1 if problems else 0)
+    for g in games:
+        if g.get("skip"):
+            print(f"{g['name']}: not added")
+            continue
+        info = g["info"]
+        flags = [f for f, on in (("admin", info["admin"]), ("driver-undo", bool(info["services"]))) if on]
+        steam = "skip" if args.no_steam else "ok" if steam_ok else "failed"
+        apollo = "skip" if args.no_apollo else "ok" if apollo_ok else "failed"
+        print(f"{g['name']}: steam={steam} apollo={apollo} cover={g['cover_src'] or 'none'}"
+              f"{' [' + ','.join(flags) + ']' if flags else ''}{' (dry-run)' if args.dry_run else ''}"
+              f"{' - with problems' if g['problems'] else ''}")
+    sys.exit(1 if problems or any(g.get("skip") or g["problems"] for g in games) else 0)
 
 
 def cmd_list(args, conf):
     for user in steam_users(conf["STEAM_DIR"]):
         for v in read_shortcuts(user / "config" / "shortcuts.vdf").values():
-            print(f"steam[{user.name}] {v.get('AppName')}  {v.get('Exe')}")
+            print(f"steam[{user.name}] {v.get('AppName')}  {v.get('Exe')} {v.get('LaunchOptions', '')}".rstrip())
     for a in read_apps(conf)["apps"]:
         print(f"apollo {a.get('name')}  {a.get('cmd') or ' '.join(a.get('detached', []))}")
 
@@ -572,8 +619,11 @@ def main(argv):
     ap = argparse.ArgumentParser(prog="add-game")
     sub = ap.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("add")
-    a.add_argument("launcher")
+    a.add_argument("launcher", nargs="?")
     a.add_argument("--name")
+    a.add_argument("--args", help="arguments after the exe, e.g. an emulator's ROM path (needs --name)")
+    a.add_argument("--batch", help="JSON list of {launcher, name, args, sgdb_id, admin}: one Steam restart, "
+                                   "one UAC prompt")
     a.add_argument("--sgdb-id", type=int)
     a.add_argument("--admin", dest="admin", action="store_true", default=None)
     a.add_argument("--no-admin", dest="admin", action="store_false")

@@ -1,0 +1,24 @@
+# ~/.config/ivan-the-terminal/emulators.conf
+# The emulation folder holds everything; the emulators only point at it:
+#   roms/<system>/  bios/ (PS3UPDAT.PUP, prod.keys + title.keys, Firmware*.zip)  mods/switch/<Game> [<TitleID>][mods]/
+#   patches/  saves/xbox360 (Xenia content)  saves/ps3 (RPCS3 savedata)  saves/switch (Switch NAND user/save)
+EMULATION_ROOT="D:\Emulation"
+EMU_DIR="C:\Emulators"                 # xenia-canary/, rpcs3/, eden/ go here
+
+RES_SCALE=2                            # Xbox 360 + PS3 internal resolution: 720p x2 = 1440p
+SWITCH_RES_SCALE=1.5                   # Switch docked 1080p x1.5 = 1620p (0.5 0.75 1 1.25 1.5 2 3 4)
+
+# Switch mods to enable from mods/switch (regex on the mod folder name)
+SWITCH_MODS="60 ?FPS|Stabilize|1920x1080|Disable Dynamic Resolution|Improved Level of Detail"
+SWITCH_MODS_SKIP="Ultrawide|120 ?FPS|Snapshot Quality"
+SWITCH_USER="Player"                   # name for the Eden profile that owns saves/switch
+# SWITCH_PROFILE=""                    # only if saves/switch holds several profile UUIDs
+# XENIA_PROFILE=""                     # only if saves/xbox360 holds several profile XUIDs
+
+# Game patches to turn on (regex on the patch name), per Xbox 360 title id / PS3 serial
+# XENIA_PATCH_4D5307F1="60 FPS|1280x720 Resolution"
+# RPCS3_PATCH_BCES00791="Native PS3 Timing"
+
+# Steam + Apollo shortcuts: GAME="<system>|<rom file or PS3 folder under roms/<system>>|<name>[|<steamgriddb id>]"
+# GAME="switch|Some Game [0100000000000000][v0].nsp|Some Game"
+# GAME="ps3|Some Collection|Some Collection"

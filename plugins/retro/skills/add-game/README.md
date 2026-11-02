@@ -32,8 +32,9 @@ For streaming, Apollo itself needs its two drivers and the primary-display setti
 ## Usage
 
 ```text
-itt run add-game add "<launcher>" [--name "<Title>"] [--sgdb-id <id>] [--admin | --no-admin]
-                                  [--no-steam] [--no-apollo] [--dry-run]
+itt run add-game add "<launcher>" [--name "<Title>"] [--args "<arguments>"] [--sgdb-id <id>]
+                                  [--admin | --no-admin] [--no-steam] [--no-apollo] [--dry-run]
+itt run add-game add --batch games.json [--no-steam] [--no-apollo] [--dry-run]
 itt run add-game list
 itt run add-game remove "<Title>" [--no-steam] [--no-apollo] [--dry-run]
 ```
@@ -41,6 +42,8 @@ itt run add-game remove "<Title>" [--no-steam] [--no-apollo] [--dry-run]
 | Option | Use it when |
 |---|---|
 | `--name` | the folder name isn't the game's title, or you want a different display name |
+| `--args` | the launcher needs arguments, e.g. an emulator and its ROM: `add "C:\Emulators\eden\eden.exe" --args '-f -g "D:\roms\switch\Game.nsp"' --name "Game"`. They go into Steam's launch options and Apollo's command. Needs `--name`. |
+| `--batch` | you add several games: a JSON list of `{"launcher", "name", "args", "sgdb_id", "admin"}`. Steam restarts once and Apollo needs one UAC prompt for the whole list. The [emulators](../emulators/README.md) skill uses this. |
 | `--sgdb-id` | the art is for the wrong game; take the id from `steamgriddb.com/game/<id>` |
 | `--admin` / `--no-admin` | the admin detection for scripts got it wrong |
 | `--no-steam` / `--no-apollo` | you want the game on one side only |

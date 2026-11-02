@@ -15,6 +15,7 @@ Secret: `STEAMGRIDDB_API_KEY`. The script decrypts it in memory from `SGDB_SECRE
 3. Add (name defaults to the launcher's folder name):
    `itt run add-game add "<launcher>" [--name "<Game>"]`
    - `--dry-run` previews; `--no-steam` / `--no-apollo` do one side only. Re-running updates in place (keeps Steam play time, Apollo uuid).
+   - Emulated games: `--args "<rom args>" --name "<Game>"`, or let the `emulators` skill build them (`itt run emulators games`). Several games at once: `--batch games.json` (one Steam restart, one UAC prompt).
    - Apollo writes need admin: Ivan clicks Yes on one UAC prompt, then Apollo restarts (this ends any running stream).
 4. Check the `note art:` line names the right game. If it's wrong, re-run with `--name` (the store title) or `--sgdb-id <id>` (from steamgriddb.com/game/<id>).
 5. `itt run add-game list` shows both sides; `itt run add-game remove "<Game>"` removes the shortcut, its grid art and the Apollo entry.
