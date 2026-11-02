@@ -14,7 +14,7 @@ Config: `~/.config/ivan-the-terminal/emulators.conf` (template: `config.example`
 2. Wire them to the emulation folder (safe to re-run after any change to the config or the folder):
    `itt run emulators setup [xenia rpcs3 eden]`
    - Saves: Xenia `content_root` → `saves/xbox360`; RPCS3 `dev_hdd0/home/00000001/savedata` and Eden `nand/user/save` are junctions to `saves/ps3` and `saves/switch`. A folder that already holds saves is never replaced: setup stops with a PROBLEM; merge it into the library by hand, with Ivan.
-   - Eden gets the profile UUID that owns `saves/switch`, so old saves show up. Updates and DLC next to the ROMs load without installing.
+   - Eden gets the profile UUID that owns `saves/switch`, so old saves show up. DLC next to the ROMs loads without installing; updates don't (Eden takes their data but not their code), so setup reports each uninstalled update of a `GAME=` Switch game as a PROBLEM: Ivan installs them in Eden with File > Install Files to NAND.
    - Mods: folders in `mods/switch/<Game> [<TitleID>][mods]/` matching `SWITCH_MODS` (and not `SWITCH_MODS_SKIP`) are copied to Eden's `load/`. Patches: `XENIA_PATCH_<titleid>` / `RPCS3_PATCH_<serial>` regexes.
 3. Fix each `PROBLEM`. The PS3 firmware needs RPCS3 to run once; hand Ivan the exact `--installfw` command from the output.
 4. Add games to Steam + Apollo: add `GAME="<system>|<rom or PS3 folder>|<name>"` lines to the config, then
@@ -36,5 +36,6 @@ For the folder layout, what each setting does and why, read `README.md`.
 - `keys`/firmware errors in Eden: `prod.keys`, `title.keys` and a `Firmware*.zip` must be under `bios/`; re-run setup after replacing them.
 - Game too fast/slow after a 60 fps patch: the patch ties game speed to frame rate; turn it off in the config (`SWITCH_MODS`, `*_PATCH_*`) and re-run setup.
 - Stream shows the desktop: see add-game's Fixes (Apollo virtual display + `ensure_primary`).
+- Switch game crashes within seconds, or hangs on a black/blue screen with music: its update isn't in NAND (`setup eden` says which). Confirm in `%APPDATA%\eden\log\eden_log.txt` (written when Eden exits; the previous run is `.old.txt`): a mod's base-version `.pchtxt` (e.g. `1.0.0`) being applied means the base code runs. Don't chase renderer settings first.
 - Switch game stuck on "Press a button on the controller you want to use" (Pokemon Let's Go): it refuses a Pro Controller when docked; add its title id to `SWITCH_HANDHELD` and re-run `setup eden` with Eden closed (it rewrites its config on exit).
 - Switch game ignores the pad: during a stream run `pads`; if Moonlight's pad GUID differs from `pad stream`'s, set `SWITCH_PAD_STREAM` to it and re-run `games switch`. At the desk: `pad desk`. A PS3 game on the wrong pad: XInput slot order, the first connected pad is `#1`.
