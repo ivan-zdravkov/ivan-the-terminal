@@ -269,6 +269,44 @@ def switch_rom_tid(name):
     return m.group(1).upper() if m else None
 
 
+def rom_stem(name):
+    """'SUPER MARIO ODYSSEY [0100...][v393216][Update v1.4.1].nsp' -> 'supermarioodyssey', to pair updates with games."""
+    name = re.sub(r"\[[^\]]*\]|\([^)]*\)", "", Path(name).stem)
+    return re.sub(r"[^a-z0-9]", "", re.sub(r"\s+v[\d.]+\s*$", "", name.strip(), flags=re.I).lower())
+
+
+def nsp_files(path):
+    """File names inside an NSP (PFS0 header only)."""
+    with open(path, "rb") as f:
+        head = f.read(16)
+        if head[:4] != b"PFS0":
+            return []
+        n, size = struct.unpack_from("<II", head, 4)
+        entries = [struct.unpack("<QQII", f.read(24)) for _ in range(n)]  # offset, size, name offset, reserved
+        names = f.read(size)
+    return [names[o:names.index(b"\0", o)].decode("utf-8", "replace") for _, _, o, _ in entries]
+
+
+def switch_updates(roms, games):
+    """Update NSPs in roms for the given game ROM names: [(file, meta NCA id)]. An update's title id ends in 800
+    (base game's + 0x800) and comes from the ticket or cert inside, else the file name; it belongs to a game with
+    the same base title id or, for ROMs named without one, the same name stem."""
+    tids = {switch_rom_tid(g) for g in games} - {None}
+    stems = {rom_stem(g) for g in games}
+    out = []
+    for f in sorted(Path(roms).glob("*.nsp")):
+        try:
+            files = nsp_files(f)
+        except (OSError, struct.error, ValueError):
+            continue
+        ids = [x[:16].upper() for x in files if re.fullmatch(r"[0-9a-fA-F]{32}\.(tik|cert)", x)]
+        tid = (ids or [switch_rom_tid(f.name)])[0]
+        meta = next((x.split(".")[0].lower() for x in files if x.endswith(".cnmt.nca")), None)
+        if tid and tid.endswith("800") and meta and (tid[:13] + "000" in tids or rom_stem(f.name) in stems):
+            out.append((f, meta))
+    return out
+
+
 # ---------- install ----------
 def latest(emu):
     """(tag, [(url, filename, sha256 or None)]) of the newest official Windows build."""
@@ -696,7 +734,16 @@ def setup_eden(p, conf, notes, problems):
             managed.write_text("\n".join(chosen) + "\n", encoding="utf-8")
         if set(chosen) != before:
             notes.append(f"eden: {game.name.split(' [')[0]} mods: {', '.join(chosen) or 'none'}")
-    # config: internal resolution, ROM folder in the game list (updates + DLC there load without installing)
+    # updates: from the game folder Eden takes only their data (RomFS), not the code (ExeFS), so the base game's
+    # code runs on newer data - crashes and hangs. Installed to NAND, both load.
+    nand = user / "nand" / "user" / "Contents" / "registered"
+    installed = {f.name.split(".")[0].lower() for f in nand.rglob("*.nca")} if nand.is_dir() else set()
+    games = [g.split("|")[1].strip() for g in conf["GAME"] if g.split("|")[0].strip() == "switch" and "|" in g]
+    missing = [f.name for f, meta in switch_updates(p.roms / "switch", games) if meta not in installed]
+    if missing:
+        problems.append(f"eden: updates not installed (the base game's code would run on the update's data): "
+                        f"{'; '.join(missing)} - in Eden: File > Install Files to NAND, then re-run setup")
+    # config: internal resolution, ROM folder in the game list (DLC there loads without installing)
     cfg = user / "config" / "qt-config.ini"
     text = cfg.read_text(encoding="utf-8") if cfg.is_file() else ""
     scale = EDEN_SCALES.get(conf["SWITCH_RES_SCALE"].rstrip("0").rstrip(".") or "1")

@@ -204,6 +204,29 @@ class Layout(unittest.TestCase):
         self.assertEqual(a, f'--no-gui "{ps3 / "PS3_GAME" / "USRDIR" / "EBOOT.BIN"}"')
         self.assertEqual(emulators.command(self.p, x360)[1], f'"{x360}"')
 
+    def test_updates_pair_with_games_by_title_id_or_name(self):
+        def nsp(name, files):
+            names = b"".join(f.encode() + b"\0" for f in files)
+            offs, o = [], 0
+            for f in files:
+                offs.append(o)
+                o += len(f) + 1
+            entries = b"".join(struct.pack("<QQII", 0, 0, x, 0) for x in offs)
+            (sw / name).write_bytes(b"PFS0" + struct.pack("<II", len(files), len(names)) + bytes(4) + entries + names)
+
+        sw = self.p.roms / "switch"
+        sw.mkdir(parents=True)
+        nsp("Some Game [0100000000aaa800][v65536].nsp", ["aa" * 16 + ".cnmt.nca", "01" * 16 + ".nca"])
+        nsp("Other Game v1.2.0.nsp", ["0100000000bbb8000000000000000004.tik", "bb" * 16 + ".cnmt.nca"])
+        nsp("Third Game v1.1.0.nsp", ["0100000000ccc8000000000000000004.tik", "cc" * 16 + ".cnmt.nca"])
+        nsp("Other Game DLC [0100000000bbc001][v0].nsp", ["0100000000bbc0010000000000000004.tik",
+                                                         "dd" * 16 + ".cnmt.nca"])
+        found = emulators.switch_updates(sw, ["Some Game [0100000000AAA000][v0].nsp", "Other Game.xci"])
+        self.assertEqual([(f.name, m) for f, m in found], [("Other Game v1.2.0.nsp", "bb" * 16),
+                                                          ("Some Game [0100000000aaa800][v65536].nsp", "aa" * 16)])
+        self.assertEqual(emulators.rom_stem("SUPER MARIO ODYSSEY [0100000000010800][Update v1.4.1].nsp"),
+                         emulators.rom_stem("Super Mario Odyssey[0100000000010000][v0].nsp"))
+
     def test_link_moves_nothing_and_refuses_existing_data(self):
         target = self.p.saves / "ps3"
         link = Path(self.tmp.name) / "rpcs3" / "savedata"
