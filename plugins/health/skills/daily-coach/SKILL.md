@@ -16,7 +16,10 @@ Private:
 - This is health data: never commit it to the public repo or paste it anywhere public.
 
 ## Flow
-1. The iPhone's "Health sync" shortcut runs silently whenever Ivan opens an everyday app, at most every 2 h. It commits the last day of Health samples to `HEALTH_REPO` under `health/YYYY/MM/`. iOS only unlocks Health while the phone is unlocked.
+1. The iPhone's "Health sync" shortcut runs silently whenever Ivan opens an everyday app, at most every 2 h:
+   - At most every 6 h it first opens the ring app for a minute, so the ring syncs to Health; the ring app only pulls from the ring while it's open. Ivan just goes back.
+   - It then commits the last day of Health samples to `HEALTH_REPO` under `health/YYYY/MM/`.
+   - iOS only unlocks Health while the phone is unlocked.
 2. From `AUTO_PLAN_HOUR` the schedule runs `run.py --if-ready` every 15 min:
    - Windows: the Task Scheduler task `daily-coach`.
    - Linux: `daily-coach.timer`.

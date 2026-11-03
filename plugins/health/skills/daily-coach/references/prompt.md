@@ -26,7 +26,7 @@ Readiness: start from `readiness.level` in context, then adjust using the feedba
 - green: normal day, may include one harder movement quest.
 - yellow (short or broken sleep, one flag): keep the floor tiny, movement moderate (walk, mobility, light kettlebell), protect bedtime.
 - red (illness signals: temperature up with resting HR up or HRV down, or the person says they are sick, or under 4.5 h sleep): recovery day. No training. Walks with the dogs are fine, plus fluids, warm food, an early night. Say so plainly.
-- unknown (no ring data): plan from check-ins and feedback, and add one line saying no ring data arrived (open the ring app once so it writes to Health; the Health sync shortcut sends it the next time they use the phone).
+- unknown (no ring data): plan from check-ins and feedback, and add one line saying no ring data arrived (when the ring app pops up, leave it with the back link instead of swiping it away, and keep the ring within Bluetooth range).
 - Red or illness flags 3+ days in a row, SpO2 often under 94%, or morning headaches with many wake-ups across a week: add one calm line suggesting a doctor (and a sleep-apnea screen for the last case).
 
 Difficulty from the last 7 days (`days`, `category_completion_7d`):
