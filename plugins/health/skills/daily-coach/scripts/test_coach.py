@@ -100,6 +100,8 @@ class CoachTest(unittest.TestCase):
                     plan(recipe={"title": "x", "url": "javascript:alert(1)"}),
                     plan(recipe={"title": "x", "url": "https://evil.example/r?d=secret"}),  # not a WEB_DOMAINS site
                     plan(recipe={"title": "x", "url": "https://example.com.evil.example/r"}),
+                    plan(recipe={"title": "x", "url": "https://evil.example\\@example.com/r?d=1"}),  # parser mismatch
+                    plan(recipe={"title": "x", "url": "https://u@example.com/r"}),
                     plan(tip="see https://evil.example/?d=1"), plan(headline="evil.example/x"),
                     plan(why="go to www.evil"),
                     plan(items=[{"id": "a", "kind": "check", "label": "visit evil.example", "xp": 1}]),
@@ -249,6 +251,7 @@ class GuardTest(unittest.TestCase):
         self.assertEqual(self.run_guard(g, {**ok, "htmlBody": mail["html"].replace("\n", "\n  ")}, tools=T), 0)  # spacing
         for bad in ({**ok, "htmlBody": mail["html"] + "<img src='https://evil.example/?d=1'>"},
                     {**ok, "body": mail["text"] + " https://evil.example/?d=1"}, {**ok, "subject": "Daily plan x"},
+                    {**ok, "subject": mail["subject"].replace(" ", "\r\nBcc: x@example.org\r\n", 1)},
                     {**ok, "to": ["Me <me@example.com>"]}, {**ok, "to": ["x@example.org"]},
                     {**ok, "to": ["me@example.com", "x@example.org"]}, {**ok, "bcc": ["x@example.org"]},
                     {**ok, "replyToMessageId": "m1"}, {"draftId": "r1"}):
@@ -272,6 +275,8 @@ class GuardTest(unittest.TestCase):
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://evil.example/?d=1"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://example.org.evil.example/"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "http://example.org/"}), 2)
+        self.assertEqual(self.run_guard("WebFetch", {"url": "https://evil.example\\@example.org/?d=1"}), 2)
+        self.assertEqual(self.run_guard("WebFetch", {"url": "https://evil.example@example.org/"}), 2)
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/plan.json"}), 0)
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/../etc/x"}), 2)
         self.assertEqual(self.run_guard("Edit", {"file_path": "/etc/profile"}), 2)

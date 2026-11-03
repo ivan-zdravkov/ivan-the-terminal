@@ -15,14 +15,56 @@ import json
 import re
 import shlex
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 SEND_FIELDS = {"to", "cc", "bcc", "subject", "body", "htmlBody", "html_body", "includeSignature"}
 SYSTEM_LABELS = {"TRASH", "SPAM"}
 HELPERS = ("fetch.py", "q.py", "page.py")
-# Anything a mail client fetches on open would carry data out without a click (tracking-pixel style)
-REMOTE = re.compile(r"(?i)<\s*(img|image|link|style|iframe|frame|object|embed|video|audio|source|svg|form|meta|base)\b"
-                    r"|\b(src|srcset|background|poster)\s*=|url\s*\(|@import")
+# The digest's HTML: plain structure and https/mailto links only. Anything a mail client fetches on open (images,
+# CSS backgrounds, even entity- or escape-obfuscated ones) would carry data out without a click, so no other tag and
+# no attribute but <a href> gets through. Parsed, not pattern-matched, so entities are decoded first.
+TAGS = {"a", "p", "div", "span", "br", "hr", "b", "strong", "i", "em", "u", "small", "code", "blockquote", "h1", "h2",
+        "h3", "h4", "ul", "ol", "li", "table", "thead", "tbody", "tr", "td", "th"}
+HREF = re.compile(r"(?:https://|mailto:)[^\s\\<>\"'`]*")
+
+
+class PlainHtml(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.bad = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in TAGS:
+            self.bad.append(f"<{tag}>")
+        for k, v in attrs:
+            if not (tag == "a" and k == "href" and HREF.fullmatch(v or "")):
+                self.bad.append(f"<{tag} {k}=...>")
+
+    handle_startendtag = handle_starttag
+
+    def handle_endtag(self, tag):
+        if tag not in TAGS:
+            self.bad.append(f"</{tag}>")
+
+    def handle_comment(self, data):
+        self.bad.append("comment")
+
+    def handle_decl(self, decl):
+        self.bad.append("declaration")
+
+    def unknown_decl(self, data):
+        self.bad.append("declaration")
+
+    def handle_pi(self, data):
+        self.bad.append("processing instruction")
+
+
+def html_problems(s):
+    p = PlainHtml()
+    p.feed(s)
+    p.close()
+    return p.bad
 
 
 def block(reason):
@@ -47,8 +89,10 @@ def check(tools_dir, work, allowed, event):
         recipients = [a for key in ("to", "cc", "bcc") for a in addresses(args.get(key))]
         if not allowed or not recipients or any(r not in allowed for r in recipients):
             block("send_message may only go to the digest recipient. Use create_draft for anything else.")
-        if any(REMOTE.search(str(args.get(k) or "")) for k in ("htmlBody", "html_body", "body")):
-            block("the digest is text and links only: no images, styles, frames or other remote content")
+        bad = [x for k in ("htmlBody", "html_body") for x in html_problems(str(args.get(k) or ""))]
+        if bad:
+            block(f"the digest is plain HTML: tags {sorted(TAGS)}, only <a href=https://...>, no other attributes "
+                  f"(found {', '.join(bad[:5])})")
     elif tool.endswith(("__reply", "__forward", "__update_draft")):
         block("the only mail this run sends is the digest; replies to recruiters are drafts")
     elif tool.endswith("__create_draft"):

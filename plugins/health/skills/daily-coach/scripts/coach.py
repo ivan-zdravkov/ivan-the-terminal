@@ -28,7 +28,6 @@ import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from urllib.parse import urlparse
 
 HOME = Path.home()
 CONF = Path(os.environ.get("DAILY_COACH_CONF") or
@@ -398,13 +397,16 @@ def text(s, n):
     return s
 
 
+# Strict on purpose: no userinfo, backslash or whitespace, so Python and browsers can't disagree about the host
+# (urlparse reads "https://evil.example\@good.example/" as good.example; a browser goes to evil.example).
+SAFE_URL = re.compile(r"https://([a-z0-9-]+(?:\.[a-z0-9-]+)+)(?::\d{1,5})?(?:[/?#][^\s\\@<>\"'`]*)?", re.I)
+
+
 def recipe_url(url):
-    u = urlparse(str(url))
-    host, domains = (u.hostname or "").lower(), CFG["WEB_DOMAINS"].lower().split()
-    if u.scheme != "https" or not host:
-        raise ValueError("recipe.url must be an https:// URL")
-    if not any(host == d or host.endswith("." + d) for d in domains):
-        raise ValueError(f"recipe.url must be on a WEB_DOMAINS site: {sorted(domains)}")
+    m = SAFE_URL.fullmatch(str(url))
+    host, domains = (m.group(1).lower() if m else ""), CFG["WEB_DOMAINS"].lower().split()
+    if not host or not any(host == d or host.endswith("." + d) for d in domains):
+        raise ValueError(f"recipe.url must be a plain https:// URL on a WEB_DOMAINS site: {sorted(domains)}")
     return clean(url, 500)
 
 

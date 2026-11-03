@@ -17,7 +17,6 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
 
 SUBCOMMANDS = {"context", "checks-set", "plan-set", "email", "has-plan", "status"}
 SEND_FIELDS = {"to", "subject", "body", "htmlBody"}
@@ -25,6 +24,9 @@ SEND_FIELDS = {"to", "subject", "body", "htmlBody"}
 # mail make the run read the rest of the mailbox; thread ids from this search can't be guessed for other threads.
 QUERY = 'subject:"Daily plan" from:me newer_than:8d'
 SEARCH_FIELDS = {"query", "pageSize", "pageToken", "view"}
+# Strict on purpose: urlparse reads "https://evil.example\@good.example/" as good.example, Claude Code's fetch
+# (WHATWG URL) as evil.example. No userinfo, backslash or whitespace leaves nothing to disagree about.
+SAFE_URL = re.compile(r"https://([a-z0-9-]+(?:\.[a-z0-9-]+)+)(?::\d{1,5})?(?:[/?#][^\s\\@<>\"'`]*)?", re.I)
 
 
 def block(reason):
@@ -58,7 +60,7 @@ def check(tools_dir, work, mail_to, event, domains=()):
             if not mail_to or (to != mail_to and to != [mail_to]):
                 block("send_message goes only to the plan's recipient, as `coach.py email` gives it")
             mail = rendered(tools_dir)
-            if mail.get("to") != mail_to or squash(args.get("subject")) != squash(mail["subject"]) \
+            if mail.get("to") != mail_to or args.get("subject") != mail["subject"] \
                     or squash(args.get("htmlBody")) != squash(mail["html"]) or squash(args.get("body")) != squash(mail["text"]):
                 block("send exactly what `coach.py email` printed: to, subject, htmlBody = html, body = text")
         elif name == "search_threads":
@@ -69,10 +71,10 @@ def check(tools_dir, work, mail_to, event, domains=()):
     elif tool.startswith("mcp__"):
         block(f"{tool}: this run uses no other MCP tools")
     elif tool == "WebFetch":
-        u = urlparse(str(args.get("url", "")))
-        host = (u.hostname or "").lower()
-        if u.scheme != "https" or not host:
-            block("WebFetch: https URLs only")
+        m = SAFE_URL.fullmatch(str(args.get("url", "")))
+        host = m.group(1).lower() if m else ""
+        if not host:
+            block("WebFetch: plain https:// URLs only (no user@, backslashes or spaces)")
         if not any(host == d or host.endswith("." + d) for d in domains):
             block(f"WebFetch only on the recipe sites {sorted(domains)}")
     elif tool in ("Write", "Edit"):
