@@ -53,7 +53,7 @@ def prompt_for(work, to):
 def settings_for(work, to):
     guard = shlex.join([sys.executable, "-I", TOOLS.joinpath("guard.py").as_posix(), TOOLS.as_posix(),
                         work.as_posix(), to])  # hooks run in bash, also on Windows (Git Bash)
-    return {"hooks": {"PreToolUse": [{"matcher": "Bash|PowerShell|Write|Edit|mcp__claude_ai_Gmail__.*",
+    return {"hooks": {"PreToolUse": [{"matcher": "Bash|PowerShell|Monitor|Write|Edit|mcp__claude_ai_Gmail__.*",
                                       "hooks": [{"type": "command", "command": guard}]}]}}
 
 
@@ -70,7 +70,7 @@ def command(model, settings, work):
     disallowed = [f"{G}__forward", f"{G}__reply", f"{G}__trash_message", f"{G}__trash_thread",
                   f"{G}__delete_draft", f"{G}__delete_label", f"{G}__mark_message_spam", f"{G}__mark_thread_spam",
                   f"{G}__update_draft", f"{G}__untrash_message", f"{G}__untrash_thread", f"{G}__create_label",
-                  f"{G}__update_label", "PowerShell", "NotebookEdit"]
+                  f"{G}__update_label", "PowerShell", "Monitor", "Agent", "Task", "NotebookEdit"]
     return ["claude", "-p", "--model", model, "--permission-mode", "dontAsk", "--settings", str(settings),
             "--allowedTools", *allowed, "--disallowedTools", *disallowed], allowed
 

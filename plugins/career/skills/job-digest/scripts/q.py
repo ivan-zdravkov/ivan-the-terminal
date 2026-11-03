@@ -29,6 +29,7 @@ def main(argv):
         fail("NAME must be a file in the work dir")
     if any(b in jq_filter for b in BLOCKED):
         fail("filter uses a blocked jq feature")
+    os.environ["NoDefaultCurrentDirectoryInExePath"] = "1"  # Windows: never a jq planted in the work dir (the cwd)
     jq = shutil.which("jq") or fail("jq is not installed")
     sys.exit(subprocess.run([jq, *opts, "--", jq_filter, str(Path(work) / name)]).returncode)
 

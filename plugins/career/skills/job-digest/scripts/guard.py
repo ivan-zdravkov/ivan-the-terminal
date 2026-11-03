@@ -7,9 +7,9 @@
 - create_draft: no attachments (the candidate attaches the CV by hand)
 - label_* / unlabel_thread: never TRASH/SPAM; unlabel may only remove INBOX/UNREAD (archive)
 - Write/Edit: only files inside WORK_DIR
-- PowerShell: never
-- Bash: a single call to a helper in TOOLS_DIR (fetch.py, q.py, page.py) or `date`;
-  no chaining, redirects or substitution. TOOLS_DIR is written with forward slashes, also on Windows
+- PowerShell, Monitor: never
+- Bash: a single call to a helper in TOOLS_DIR (fetch.py, q.py, page.py) or `date [+FORMAT]`;
+  no chaining, redirects, substitution or `$`. TOOLS_DIR is written with forward slashes, also on Windows
 """
 import json
 import re
@@ -65,12 +65,12 @@ def check(tools_dir, work, allowed, event):
         path = Path(str(args.get("file_path", ""))).resolve()
         if Path(work).resolve() not in path.parents:
             block(f"Write/Edit only inside {work}")
-    elif tool == "PowerShell":
-        block("PowerShell is not available to this run")
+    elif tool in ("PowerShell", "Monitor"):
+        block(f"{tool} is not available to this run")
     elif tool == "Bash":
         cmd = args.get("command", "")
-        if re.search(r"[`\n]|\$[({]", cmd):
-            block("no command substitution or multi-line commands")
+        if re.search(r"[`\n$]", cmd):  # no `$`: bash's $'..' quoting reads \' differently from shlex
+            block("no $, command substitution or multi-line commands")
         lexer = shlex.shlex(cmd, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
         lexer.commenters = ""  # shlex ends a word at a mid-word '#'; bash doesn't: `x#;y` would hide `;y`
@@ -78,7 +78,10 @@ def check(tools_dir, work, allowed, event):
         if not words or any(set(w) <= set("();<>|&") for w in words):
             block("one plain command per call: no pipes, chaining or redirects")
         helpers = {f"{tools_dir.rstrip('/')}/{n}" for n in HELPERS}
-        if words[0] not in helpers and words[0] != "date":
+        if words[0] == "date":
+            if len(words) > 2 or (len(words) == 2 and not words[1].startswith("+")):
+                block("date takes at most a +FORMAT (date -f/-r would read files)")
+        elif words[0] not in helpers:
             block(f"Bash may only run {sorted(helpers)} or date")
 
 
