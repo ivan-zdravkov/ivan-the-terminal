@@ -44,6 +44,10 @@ class Agreement(unittest.TestCase):
         self.assertIn("{{DIGEST_TO}}", PROMPT)
         self.assertIn("{{WORK}}", PROMPT)
 
+    def test_hooks_never_use_pythonw(self):  # pythonw has no stdio: the guard could not read its event
+        self.assertNotEqual("pythonw.exe", run.PY.name.lower())
+        self.assertNotIn("pythonw", run.settings_for(Path("/w"), ME)["hooks"]["PreToolUse"][0]["hooks"][0]["command"])
+
     def test_rule_paths(self):
         self.assertEqual("//c/Work/digest", run.rule_path(Path("C:/Work/digest")))
         self.assertEqual("//srv/work", run.rule_path(Path("/srv/work")))
