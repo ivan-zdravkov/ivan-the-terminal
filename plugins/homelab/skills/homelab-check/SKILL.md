@@ -1,7 +1,7 @@
 ---
 name: homelab-check
 description: Health-check the home machine - OS image and pending reboot, app/firmware updates, disk space, SMART, nofail mounts (e.g. a dirty NTFS backup drive), failed or watched systemd units, containers, DNS/internet, tailnet peers. Use when something "stopped working", games or ROMs are missing, streaming or a service fails, before or after updates, or when asked how the machine is doing.
-compatibility: Linux (systemd, rpm-ostree, smartctl); a Windows run.ps1 is on the roadmap
+compatibility: Linux (systemd, rpm-ostree, smartctl); a Windows run.ps1 is planned
 ---
 
 # Homelab check

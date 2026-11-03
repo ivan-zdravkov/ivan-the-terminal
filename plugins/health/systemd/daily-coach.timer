@@ -1,8 +1,8 @@
 [Unit]
-Description=Daily coach fallback: make today's plan mid-morning if no ring sync started it
+Description=Daily coach: every 15 min in the morning, import Health sync files and make the plan once last night's sleep is in
 
 [Timer]
-OnCalendar=*-*-* 10:30
+OnCalendar=*-*-* 06..10:00/15
 Persistent=true
 
 [Install]

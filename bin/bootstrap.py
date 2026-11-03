@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Set up (or repair) this machine for ivan-the-terminal. Idempotent; safe to re-run. Stdlib only.
   Linux:   brew toolchain, symlinks, ~/.bashrc.d hook, systemd --user units
-  Windows: winget toolchain, junctions + itt.cmd shim, PowerShell profile hook (services: docs/roadmap.md)
+  Windows: winget toolchain, junctions + itt.cmd shim, PowerShell profile hook (skills with schedules: `itt run <skill> --install-task`)
   --no-extras   skip the per-skill tools (tier "extra" in toolchain.txt)
 """
 import os
@@ -170,7 +170,7 @@ def link_skills():
 
 def services():
     if WINDOWS:
-        say("plugin timers and services: not on Windows yet (Task Scheduler port, docs/roadmap.md)")
+        say("plugin schedules: `itt run job-digest --install-task`, `itt run daily-coach --install-task` (Task Scheduler)")
         return
     say("plugin timers and services (systemd --user)")
     units = sorted(ITT_HOME.glob("plugins/*/systemd/*.service")) + sorted(ITT_HOME.glob("plugins/*/systemd/*.timer"))

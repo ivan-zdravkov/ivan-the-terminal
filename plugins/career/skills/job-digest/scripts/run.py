@@ -30,8 +30,8 @@ PY = Path(sys.executable).with_name("python.exe") if Path(sys.executable).name.l
     else Path(sys.executable)
 
 
-def load_webapp():
-    spec = importlib.util.spec_from_file_location("webapp", SKILL.parents[3] / "tools/webapp/webapp.py")
+def load_envfile():
+    spec = importlib.util.spec_from_file_location("envfile", SKILL.parents[3] / "tools/envfile.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -108,7 +108,7 @@ def main(argv):
         print(f"job-digest: not configured: create {CONF}/config.env and profile.md "
               f"(templates in {SKILL}/config.example)")
         return 0
-    conf = load_webapp().env(CONF / "config.env", DEFAULTS)
+    conf = load_envfile().env(CONF / "config.env", DEFAULTS)
     model, to = conf["MODEL"], conf["DIGEST_TO"].strip()
     if not to:
         print(f"job-digest: DIGEST_TO missing in {CONF}/config.env", file=sys.stderr)

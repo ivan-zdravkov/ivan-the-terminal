@@ -158,7 +158,7 @@ def links():
 
 def scheduler():
     if not LINUX:
-        return  # Windows: Task Scheduler port pending (docs/roadmap.md)
+        return  # Windows: skills register their own Task Scheduler tasks (--install-task)
     for timer in sorted(ITT_HOME.glob("plugins/*/systemd/*.timer")):
         if sh("systemctl", "--user", "is-enabled", "-q", timer.name).returncode == 0:
             r("ok", f"timer:{timer.stem}")

@@ -1,11 +1,13 @@
 # ~/.config/ivan-the-terminal/daily-coach/config.env
 MODEL="claude-sonnet-5-5"
-TOKEN=""                             # empty: generated once into the data dir, outside any repo (`coach url` shows the links)
-BIND="127.0.0.1"                     # localhost only: `tailscale serve` publishes it on the tailnet with HTTPS
-PORT=8765
-PUBLIC_URL="https://<machine>.<tailnet>.ts.net"   # the tailscale serve address: links, shortcut URLs, push sender id
+MAIL_TO="you@example.com"            # the ONLY address the run may send to (the guard enforces it)
+HEALTH_REPO="~/Repositories/<private-repo>"   # a local clone of the repo the iPhone's Health sync commits to;
+                                     # absolute, ~/..., or relative to this file's real folder (e.g. "../../..")
+HEALTH_DIR="health"                  # the folder in that repo (health/YYYY/MM/*.txt)
+HEALTH_REF="origin/main"             # read from here after `git fetch`; the clone's working tree is never touched
 DAY_START_HOUR=4                     # before 04:00 still counts as the previous day (night wake-ups)
-AUTO_PLAN_HOUR=6                     # a ring sync after this hour, 20+ min after the night ended, starts the plan
+AUTO_PLAN_HOUR=6                     # start checking for last night's sleep at this hour, every 15 min
+PLAN_BY="10:30"                      # make the plan by then even without ring data
 WEB_DOMAINS=""                       # recipe sites the run may WebFetch, space-separated (empty = any https site)
 LEVEL_NAMES=""                       # optional, comma-separated names for levels 1, 2, 3, ...
 

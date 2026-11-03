@@ -1,10 +1,10 @@
 [Unit]
-Description=Daily coach: make today's plan for the app (Claude Code, headless) if there is none yet
+Description=Daily coach: import Health sync files; make and email today's plan once last night's sleep is in (Claude Code, headless)
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/bin/itt run daily-coach --if-missing
+ExecStart=%h/.local/bin/itt run daily-coach --if-ready
 Environment=PATH=%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
 TimeoutStartSec=20min
