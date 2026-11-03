@@ -33,11 +33,11 @@ plugins/<plugin>/skills/<skill>/
 
 Skills that run unattended (timers) use headless `claude -p` with a tool allowlist and a guard hook, logging to `~/.local/state/ivan-the-terminal/<skill>/`.
 
-Skills that report something daily store the result locally and serve it as a home-screen phone app instead of emailing it. Each runs a stdlib server on localhost, published on the tailnet by `tailscale serve`, with shared offline and push support from `tools/webapp/` (see [phone-apps.md](phone-apps.md)). The headless run only stores the result; the runner script sends the push.
+Skills that report something daily (job-digest, daily-coach) email it to their owner. The headless run sends that one email itself, and its guard lets mail go only to the configured address. Feedback comes back as replies, which the next run reads. There are no servers to keep running: on Windows a Task Scheduler task (`run.py --install-task`) runs them, on Linux a systemd timer.
 
 ## Portability
 
-Everything that can be is stdlib Python, so the same skills run on Linux and Windows (CI tests both): `itt`, doctor, ship-check, the git hooks, leakguard and the skill scripts. `itt bootstrap` is Python too, with one branch per OS for the package manager, links and services. Work tied to one OS stays native and says so: systemd units, the shell wrappers in `shell/`, and `scripts/run.sh` in skills like homelab-check. Their Windows twins (`.ps1`, Task Scheduler) are tracked in the [roadmap](roadmap.md#windows).
+Everything that can be is stdlib Python, so the same skills run on Linux and Windows (CI tests both): `itt`, doctor, ship-check, the git hooks, leakguard and the skill scripts. `itt bootstrap` is Python too, with one branch per OS for the package manager, links and services. Work tied to one OS stays native and says so: systemd units, the shell wrappers in `shell/`, and `scripts/run.sh` in skills like homelab-check. Their Windows twins (`.ps1`, Task Scheduler) are tracked in the private backlog.
 
 ## Secrets
 

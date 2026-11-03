@@ -23,7 +23,19 @@ def guard(tool, args):
 class Guard(unittest.TestCase):
     def test_sends_only_the_digest_to_the_recipient(self):
         self.assertEqual(0, guard(G + "send_message", {"to": [ME], "subject": "d", "htmlBody": "<p>x</p>"}))
-        self.assertEqual(0, guard(G + "send_message", {"to": ["Me <ME@example.com>"], "subject": "d", "body": "x"}))
+        self.assertEqual(0, guard(G + "send_message", {"to": ["ME@example.com"], "subject": "d", "body": "x"}))
+        self.assertEqual(2, guard(G + "send_message", {"to": ["Me <ME@example.com>"], "subject": "d", "body": "x"}))
+        self.assertEqual(2, guard(G + "send_message", {"to": [f"<x@example.org> <{ME}>"], "body": "x"}))
+        for html in ('<img src="https://e.example/?d=1">', "<p style='background:url(https://e.example/x)'>",
+                     "<td style=\"background-image:u&#114;l(https://e.example/p)\">", "<p style='color:red'>x</p>",
+                     "<link rel=stylesheet href=https://e.example/x>", "<IFRAME src=x>", "<svg><image href=x/></svg>",
+                     "<a href='javascript:alert(1)'>x</a>", "<a href='https://e.example/' title=x>x</a>",
+                     "<a href='https://e.example\\@good.example/'>x</a>", "<!--[if mso]><img src=x><![endif]-->",
+                     "<img/src=x>", "<p onclick=x>"):
+            self.assertEqual(2, guard(G + "send_message", {"to": [ME], "subject": "d", "htmlBody": html}), html)
+        self.assertEqual(0, guard(G + "send_message", {"to": [ME], "subject": "d", "htmlBody":
+                                                       "<h2>Jobs &amp; more</h2><ul><li><b>1.</b> <a href='https://e.example/j?src_id=1&amp;x=2'>x</a>"
+                                                       "</li></ul><p><a href=\"mailto:a@example.org\">mail</a><br></p>"}))
         self.assertEqual(2, guard(G + "send_message", {"to": ["recruiter@example.org"], "body": "x"}))
         self.assertEqual(2, guard(G + "send_message", {"to": [ME], "bcc": ["x@example.org"], "body": "x"}))
         self.assertEqual(2, guard(G + "send_message", {"to": [f"{ME}, x@example.org"], "body": "x"}))

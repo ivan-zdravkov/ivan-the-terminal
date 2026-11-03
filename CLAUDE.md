@@ -1,6 +1,6 @@
 # ivan-the-terminal
 
-Public (MIT) home of Ivan's Claude Code skills, scripts and docs: a self-hosted copilot for home infrastructure, retro gaming, career, kitchen and training. The goal is to replace paid or enshittified services with things he owns.
+Public (MIT) home of Ivan's Claude Code skills, scripts and docs: a self-hosted copilot for home infrastructure, retro gaming, career, health and civic chores. The goal is to replace paid or enshittified services with things he owns.
 
 ## Data tiers: decide before writing anything here
 - **Tier 0, this repo (public):** generic, reusable, safe for anyone to read.
@@ -25,6 +25,6 @@ Never push to main, never `--no-verify`, never weaken leakguard to get past a fi
 - `plugins/<plugin>/skills/<skill>/` — skills (marketplace: `.claude-plugin/marketplace.json`)
 - `bin/itt` — CLI (Python, Linux + Windows): `doctor`, `bootstrap` (`bootstrap.py`), `ship-check`, `guard`, `run`
 - `tools/leakguard/` — personal-data scanner behind the git hooks, CI and the Claude PreToolUse hook
-- `docs/` — architecture, skill-authoring conventions (follow them), roadmap
+- `docs/` — architecture, skill-authoring conventions (follow them)
 
 @~/.config/ivan-the-terminal/CLAUDE.md

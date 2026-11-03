@@ -15,11 +15,56 @@ import json
 import re
 import shlex
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 SEND_FIELDS = {"to", "cc", "bcc", "subject", "body", "htmlBody", "html_body", "includeSignature"}
 SYSTEM_LABELS = {"TRASH", "SPAM"}
 HELPERS = ("fetch.py", "q.py", "page.py")
+# The digest's HTML: plain structure and https/mailto links only. Anything a mail client fetches on open (images,
+# CSS backgrounds, even entity- or escape-obfuscated ones) would carry data out without a click, so no other tag and
+# no attribute but <a href> gets through. Parsed, not pattern-matched, so entities are decoded first.
+TAGS = {"a", "p", "div", "span", "br", "hr", "b", "strong", "i", "em", "u", "small", "code", "blockquote", "h1", "h2",
+        "h3", "h4", "ul", "ol", "li", "table", "thead", "tbody", "tr", "td", "th"}
+HREF = re.compile(r"(?:https://|mailto:)[^\s\\<>\"'`]*")
+
+
+class PlainHtml(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.bad = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in TAGS:
+            self.bad.append(f"<{tag}>")
+        for k, v in attrs:
+            if not (tag == "a" and k == "href" and HREF.fullmatch(v or "")):
+                self.bad.append(f"<{tag} {k}=...>")
+
+    handle_startendtag = handle_starttag
+
+    def handle_endtag(self, tag):
+        if tag not in TAGS:
+            self.bad.append(f"</{tag}>")
+
+    def handle_comment(self, data):
+        self.bad.append("comment")
+
+    def handle_decl(self, decl):
+        self.bad.append("declaration")
+
+    def unknown_decl(self, data):
+        self.bad.append("declaration")
+
+    def handle_pi(self, data):
+        self.bad.append("processing instruction")
+
+
+def html_problems(s):
+    p = PlainHtml()
+    p.feed(s)
+    p.close()
+    return p.bad
 
 
 def block(reason):
@@ -28,15 +73,11 @@ def block(reason):
 
 
 def addresses(value):
+    """Plain addresses only: a display name or <...> part is refused rather than parsed."""
     items = value if isinstance(value, list) else [value] if value else []
-    out = []
-    for item in items:
-        if not isinstance(item, str):
-            block("recipients must be strings")
-        for part in item.split(","):
-            m = re.search(r"<([^<>]+)>\s*$", part)
-            out.append((m.group(1) if m else part).strip().lower())
-    return [a for a in out if a]
+    if not all(isinstance(i, str) and re.fullmatch(r"[^\s<>,;\"]+@[^\s<>,;\"]+", i.strip()) for i in items):
+        block("recipients must be plain addresses, one per entry")
+    return [i.strip().lower() for i in items]
 
 
 def check(tools_dir, work, allowed, event):
@@ -48,6 +89,10 @@ def check(tools_dir, work, allowed, event):
         recipients = [a for key in ("to", "cc", "bcc") for a in addresses(args.get(key))]
         if not allowed or not recipients or any(r not in allowed for r in recipients):
             block("send_message may only go to the digest recipient. Use create_draft for anything else.")
+        bad = [x for k in ("htmlBody", "html_body") for x in html_problems(str(args.get(k) or ""))]
+        if bad:
+            block(f"the digest is plain HTML: tags {sorted(TAGS)}, only <a href=https://...>, no other attributes "
+                  f"(found {', '.join(bad[:5])})")
     elif tool.endswith(("__reply", "__forward", "__update_draft")):
         block("the only mail this run sends is the digest; replies to recruiters are drafts")
     elif tool.endswith("__create_draft"):

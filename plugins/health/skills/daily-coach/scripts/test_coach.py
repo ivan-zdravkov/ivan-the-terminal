@@ -4,17 +4,16 @@ import os
 import subprocess
 import sys
 import tempfile
-import threading
 import unittest
-import urllib.request
-from http.server import ThreadingHTTPServer
 from datetime import datetime, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TMP = tempfile.mkdtemp()
-TOKEN = "t" * 20
-Path(TMP, "config.env").write_text(f'TOKEN="{TOKEN}"\nPORT=0  # comment\nTRIGGER="true"\nLEVEL_NAMES="White,Yellow"\n')
+REPO = Path(TMP, "repo")
+Path(TMP, "config.env").write_text(f'MAIL_TO="me@example.com"  # comment\nLEVEL_NAMES="White,Yellow"\n'
+                                   f'WEB_DOMAINS="example.com"\n'
+                                   f'HEALTH_REPO="{REPO.as_posix()}"\nHEALTH_REF="HEAD"\n')
 os.environ.update(DAILY_COACH_CONF=str(Path(TMP, "config.env")), DAILY_COACH_DATA=TMP)
 spec = importlib.util.spec_from_file_location("coach", HERE / "coach.py")
 coach = importlib.util.module_from_spec(spec)
@@ -35,7 +34,7 @@ def plan(**kw):
 class CoachTest(unittest.TestCase):
     def setUp(self):
         self.con = coach.db()
-        for t in ("samples", "plans", "checks", "events"):
+        for t in ("samples", "plans", "checks", "events", "imported"):
             self.con.execute(f"DELETE FROM {t}")
         self.con.commit()
         self.day = coach.today()
@@ -46,8 +45,8 @@ class CoachTest(unittest.TestCase):
         self.con.close()
 
     def test_config_parsing(self):
-        self.assertEqual(coach.CFG["PORT"], "0")
-        self.assertEqual(coach.CFG["TOKEN"], TOKEN)
+        self.assertEqual(coach.CFG["MAIL_TO"], "me@example.com")
+        self.assertEqual(coach.CFG["HEALTH_DIR"], "health")
 
     def test_ingest_and_night(self):
         d, p = self.day, self.prev
@@ -98,9 +97,19 @@ class CoachTest(unittest.TestCase):
         for bad in (plan(readiness="purple"), plan(items=[]), plan(evil=1),
                     plan(items=[{"id": "A B", "kind": "check", "label": "x"}]),
                     plan(items=[{"id": "a", "kind": "check", "label": "x", "xp": 500}]),
-                    plan(recipe={"title": "x", "url": "javascript:alert(1)"})):
-            with self.assertRaises(ValueError):
+                    plan(recipe={"title": "x", "url": "javascript:alert(1)"}),
+                    plan(recipe={"title": "x", "url": "https://evil.example/r?d=secret"}),  # not a WEB_DOMAINS site
+                    plan(recipe={"title": "x", "url": "https://example.com.evil.example/r"}),
+                    plan(recipe={"title": "x", "url": "https://evil.example\\@example.com/r?d=1"}),  # parser mismatch
+                    plan(recipe={"title": "x", "url": "https://u@example.com/r"}),
+                    plan(tip="see https://evil.example/?d=1"), plan(headline="evil.example/x"),
+                    plan(why="go to www.evil"),
+                    plan(items=[{"id": "a", "kind": "check", "label": "visit evil.example", "xp": 1}]),
+                    plan(recipe={"title": "x", "url": "https://www.example.com/r", "shopping": ["evil.example"]})):
+            with self.assertRaises(ValueError, msg=repr(bad)[:120]):
                 coach.validate(bad, self.day)
+        self.assertEqual(coach.validate(plan(tip="e.g. 10 min, 3.5 kg, a.m. walk", recipe={
+            "title": "Леща", "url": "https://www.example.com/r"}), self.day)["recipe"]["url"], "https://www.example.com/r")
 
     def test_plan_set_confined_to_work(self):
         f = Path(TMP, "plan.json")
@@ -137,27 +146,77 @@ class CoachTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             coach.save_check(self.con, d2, "pushups", done=True)  # no plan that day
 
-    def test_pages_render_and_notification(self):
-        self.store(self.day, plan(recipe={"title": "Леща <b>", "url": "https://example.com/r", "time_min": 30}))
+    def test_email_renders_and_escapes(self):
+        self.store(self.day, plan(recipe={"title": "Леща <b>", "url": "https://example.com/r", "time_min": 30,
+                                          "shopping": ["лук"]}))
         self.con.commit()
-        page = coach.today_page(self.con, self.day)
-        self.assertIn("10 push-ups", page)
-        self.assertIn("Леща &lt;b&gt;", page)
-        self.assertIn('rel="manifest"', page)
-        self.assertIn("<svg", coach.dashboard(self.con, 14) + "<svg")
-        n = coach.latest(self.con)
-        self.assertEqual(n["day"], self.day.isoformat())
-        self.assertIn("10 push-ups", n["body"])
+        coach.save_check(self.con, self.day, "pushups", done=True)
+        m = coach.email(self.con)
+        self.assertEqual(m["to"], "me@example.com")
+        self.assertTrue(m["subject"].startswith(f"Daily plan {self.day.isoformat()}: 🟢 Go"))
+        self.assertIn("Леща &lt;b&gt;", m["html"])
+        self.assertNotIn("<b>Леща <b>", m["html"])
+        self.assertIn("☑ ★ 10 push-ups", m["text"])
+        self.assertIn("☐ Weight: ___", m["text"])
+        self.assertIn("https://example.com/r", m["text"])
+        with self.assertRaises(ValueError):
+            coach.email(self.con, self.day - timedelta(days=5))  # no plan that day
 
-    def test_today_without_plan_shows_the_latest_one(self):
-        self.store(self.day - timedelta(days=2), plan(headline="Old one"))
+    def test_checks_set_from_replies(self):
+        self.store(self.prev, plan())
         self.con.commit()
-        page = coach.today_page(self.con, self.day)
-        self.assertIn("Old one", page)
-        self.assertIn(f'data-waiting="{self.day.isoformat()}"', page)
-        self.assertIn(f'data-day="{(self.day - timedelta(days=2)).isoformat()}"', page)  # check-ins go to that day
-        self.assertIn("No plan for today yet", page)
-        self.assertNotIn("data-waiting=\"2", coach.today_page(self.con, self.day - timedelta(days=2)))
+        work = Path(TMP, "work")
+        work.mkdir(exist_ok=True)
+        f = work / "checks.json"
+        f.write_text(json.dumps([{"day": self.prev.isoformat(), "id": "pushups", "done": True},
+                                 {"day": self.prev.isoformat(), "id": "weight", "value": 91.8},
+                                 {"day": self.prev.isoformat(), "id": "nope", "done": True}]), encoding="utf-8")
+        os.environ["DAILY_COACH_WORK"] = str(work)
+        try:
+            res = coach.checks_set(self.con, f)
+            outside = Path(TMP, "checks.json")
+            outside.write_text("[]", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                coach.checks_set(self.con, outside)
+        finally:
+            del os.environ["DAILY_COACH_WORK"]
+        self.assertEqual(res["stored"], 2)
+        self.assertEqual(len(res["errors"]), 1)
+        self.assertEqual(res["xp"], 15)
+
+    def test_import_from_the_repo(self):
+        def git(*args):
+            subprocess.run(["git", "-C", str(REPO), "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
+                           check=True, capture_output=True)
+        REPO.mkdir(exist_ok=True)
+        git("init", "-q")
+        d = self.day
+        Path(REPO, "health/2026/11").mkdir(parents=True, exist_ok=True)
+        Path(REPO, "health/2026/11/a.txt").write_text(f"Steps|{iso(d, 10)}|{iso(d, 11)}|500|count|Ring\n",
+                                                      encoding="utf-8")
+        Path(REPO, "notes.txt").write_text(f"Steps|{iso(d, 12)}|{iso(d, 13)}|9|count|Ring\n", encoding="utf-8")
+        git("add", "-A")
+        git("commit", "-q", "-m", "x")
+        res = coach.import_repo(self.con, do_fetch=False)
+        self.assertEqual((res["files"], res["added"], res["bad"]), (1, 1, 0))  # only files under HEALTH_DIR
+        self.assertEqual(coach.import_repo(self.con, do_fetch=False)["files"], 0)  # never twice
+        Path(REPO, "health/2026/11/b.txt").write_text("garbage\n", encoding="utf-8")
+        Path(REPO, "health/2026/11/c.txt").write_text("not committed yet\n", encoding="utf-8")
+        git("add", "health/2026/11/b.txt")
+        git("commit", "-q", "-m", "y")
+        res = coach.import_repo(self.con, do_fetch=False)
+        self.assertEqual((res["files"], res["bad"]), (1, 1))  # reads the ref, not the working tree
+        self.assertEqual(coach.steps(self.con, d), 500)
+
+    def test_health_repo_relative_to_the_config(self):
+        self.assertEqual(coach.health_repo(), REPO)
+        old = coach.CFG["HEALTH_REPO"]
+        self.addCleanup(coach.CFG.__setitem__, "HEALTH_REPO", old)
+        coach.CFG["HEALTH_REPO"] = "repo"
+        self.assertEqual(coach.health_repo(), Path(TMP).resolve() / "repo")
+        coach.CFG["HEALTH_REPO"] = ""
+        with self.assertRaises(ValueError):
+            coach.health_repo()
 
     def test_night_over_starts_the_plan_after_waking(self):
         d, p = self.day, self.prev
@@ -171,77 +230,61 @@ class CoachTest(unittest.TestCase):
         self.assertFalse(coach.night_over(self.con, wake + 25 * 60))  # no ring data: the fallback timer decides
 
 
-class ServerTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), coach.Handler)
-        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
-        cls.base = f"http://127.0.0.1:{cls.srv.server_address[1]}"
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.srv.shutdown()
-
-    def get(self, path, data=None):
-        req = urllib.request.Request(self.base + path, data=data, method="POST" if data is not None else "GET")
-        try:
-            with urllib.request.urlopen(req) as r:
-                return r.status, r.read().decode(errors="replace")
-        except urllib.error.HTTPError as e:
-            with e:
-                return e.code, e.read().decode()
-
-    def test_token_required(self):
-        self.assertEqual(self.get("/")[0], 404)
-        self.assertEqual(self.get("/wrong/")[0], 404)
-        self.assertEqual(self.get(f"/{TOKEN}/")[0], 200)
-        self.assertEqual(self.get(f"/{TOKEN}/dashboard")[0], 200)
-
-    def test_ingest_endpoint(self):
-        code, body = self.get(f"/{TOKEN}/ingest", b"Steps|2026-01-01T10:00:00+02:00|2026-01-01T11:00:00+02:00|5|count|x")
-        self.assertEqual(code, 200)
-        self.assertEqual(json.loads(body)["bad"], 0)
-
-    def test_app_shell(self):
-        for path, kind in (("manifest.webmanifest", None), ("sw.js", None), ("icon-180.png", None), ("api/latest", "day"),
-                           ("api/ping", None)):
-            code, body = self.get(f"/{TOKEN}/{path}")
-            self.assertEqual(code, 200, path)
-            if kind:
-                self.assertIn(kind, json.loads(body))
-        self.assertEqual(self.get("/sw.js")[0], 404)  # the shell is behind the token too
-
-    def test_push_subscribe_only_push_services(self):
-        ok = json.dumps({"endpoint": "https://web.push.apple.com/QAbc"}).encode()
-        self.assertEqual(self.get(f"/{TOKEN}/api/push", ok)[0], 200)
-        bad = json.dumps({"endpoint": "http://127.0.0.1:8765/x"}).encode()
-        self.assertEqual(self.get(f"/{TOKEN}/api/push", bad)[0], 400)
-
-
 class GuardTest(unittest.TestCase):
-    @unittest.skipIf(os.name == "nt", "guards the Bash tool with POSIX paths; Windows headless runs are on the roadmap")
-    def run_guard(self, tool, args, domains=("example.org",)):
-        p = subprocess.run([sys.executable, "-I", str(HERE / "guard.py"), "/t", "/w", *domains],
-                           input=json.dumps({"tool_name": tool, "tool_input": args}), capture_output=True, text=True)
+    def run_guard(self, tool, args, domains=("example.org",), tools="/t"):
+        p = subprocess.run([sys.executable, "-I", str(HERE / "guard.py"), tools, "/w", "me@example.com", *domains],
+                           input=json.dumps({"tool_name": tool, "tool_input": args}), capture_output=True, text=True,
+                           encoding="utf-8")
         return p.returncode
+
+    def test_send_is_pinned_to_the_rendered_email(self):
+        con = coach.db()
+        day = coach.today()
+        con.execute("INSERT OR REPLACE INTO plans VALUES (?,?,0)", (day.isoformat(), json.dumps(coach.validate(plan(), day))))
+        con.commit()
+        mail = coach.email(con)
+        con.close()
+        g, T = "mcp__claude_ai_Gmail__send_message", HERE.as_posix()
+        ok = {"to": ["me@example.com"], "subject": mail["subject"], "htmlBody": mail["html"], "body": mail["text"]}
+        self.assertEqual(self.run_guard(g, ok, tools=T), 0)
+        self.assertEqual(self.run_guard(g, {**ok, "to": "me@example.com"}, tools=T), 0)
+        self.assertEqual(self.run_guard(g, {**ok, "htmlBody": mail["html"].replace("\n", "\n  ")}, tools=T), 0)  # spacing
+        for bad in ({**ok, "htmlBody": mail["html"] + "<img src='https://evil.example/?d=1'>"},
+                    {**ok, "body": mail["text"] + " https://evil.example/?d=1"}, {**ok, "subject": "Daily plan x"},
+                    {**ok, "subject": mail["subject"].replace(" ", "\r\nBcc: x@example.org\r\n", 1)},
+                    {**ok, "to": ["Me <me@example.com>"]}, {**ok, "to": ["x@example.org"]},
+                    {**ok, "to": ["me@example.com", "x@example.org"]}, {**ok, "bcc": ["x@example.org"]},
+                    {**ok, "replyToMessageId": "m1"}, {"draftId": "r1"}):
+            self.assertEqual(self.run_guard(g, bad, tools=T), 2, repr(bad)[:100])
+        self.assertEqual(self.run_guard(g, ok, tools="/t"), 2)  # can't render: fail closed
 
     def test_guard(self):
         g = "mcp__claude_ai_Gmail__"
-        self.assertEqual(self.run_guard(g + "send_message", {"to": ["me@example.com"], "subject": "[daily-coach] x"}), 2)
-        self.assertEqual(self.run_guard(g + "search_threads", {"query": 'subject:"[daily-coach]" newer_than:4d'}), 2)
+        self.assertEqual(self.run_guard(g + "search_threads", {"query": 'subject:"Daily plan" from:me newer_than:8d'}), 0)
+        self.assertEqual(self.run_guard(g + "search_threads", {"query": 'subject:"Daily plan" newer_than:8d'}), 2)
+        self.assertEqual(self.run_guard(g + "search_threads", {"query": "verification code"}), 2)
+        self.assertEqual(self.run_guard(g + "get_thread", {"threadId": "t1"}), 0)
+        self.assertEqual(self.run_guard(g + "get_message", {"messageId": "m1"}), 2)
+        self.assertEqual(self.run_guard("WebFetch", {"url": "https://example.org/"}, domains=()), 2)  # fail closed
+        for tool in ("create_draft", "reply", "forward", "unlabel_thread", "trash_thread", "label_thread"):
+            self.assertEqual(self.run_guard(g + tool, {}), 2, tool)
         self.assertEqual(self.run_guard("mcp__other__anything", {}), 2)
+        self.assertEqual(self.run_guard("PowerShell", {"command": "Get-Date"}), 2)
+        self.assertEqual(self.run_guard("Monitor", {"command": "date"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://www.example.org/recipe"}), 0)
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://evil.example/?d=1"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://example.org.evil.example/"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "http://example.org/"}), 2)
-        self.assertEqual(self.run_guard("WebFetch", {"url": "https://any.example/"}, domains=()), 0)
+        self.assertEqual(self.run_guard("WebFetch", {"url": "https://evil.example\\@example.org/?d=1"}), 2)
+        self.assertEqual(self.run_guard("WebFetch", {"url": "https://evil.example@example.org/"}), 2)
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/plan.json"}), 0)
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/../etc/x"}), 2)
         self.assertEqual(self.run_guard("Edit", {"file_path": "/etc/profile"}), 2)
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py context"}), 0)
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py serve"}), 2)
+        for sub_ in ("context", "checks-set /w/checks.json", "plan-set /w/plan.json", "email", "has-plan", "status"):
+            self.assertEqual(self.run_guard("Bash", {"command": f"/t/coach.py {sub_}"}), 0, sub_)
+        for sub_ in ("import", "ready", "ingest /etc/passwd", "serve"):
+            self.assertEqual(self.run_guard("Bash", {"command": f"/t/coach.py {sub_}"}), 2, sub_)
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach context"}), 2)  # pre-.py name
-        self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py notify"}), 2)  # the runner pushes, not the model
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py context; rm -rf ~"}), 2)
         self.assertEqual(self.run_guard("Bash", {"command": "date +%F"}), 0)
         for cmd in ("date $'\\'' ; id ; echo #'", "date -f /etc/passwd", "date --file=/etc/passwd", "date -r /etc/passwd"):

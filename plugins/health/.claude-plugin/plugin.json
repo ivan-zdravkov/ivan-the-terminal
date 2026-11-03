@@ -1,7 +1,7 @@
 {
   "name": "health",
   "version": "0.1.0",
-  "description": "Daily health coach: smart-ring / Apple Health data in, a tiny gamified daily plan out (exercise snacks, a seasonal recipe, sleep, measurements), pushed to a phone app over the tailnet with check-ins, XP and trends; ring data synced by iPhone Shortcuts automations; a headless morning run with no mail access.",
+  "description": "Daily health coach: smart-ring / Apple Health data in, a tiny gamified daily plan out (exercise snacks, a seasonal recipe, sleep, measurements), emailed each morning, with check-ins by replying, XP and trends; Health data committed to a private repo by a silent iPhone Shortcuts automation; a headless morning run that can only mail you.",
   "author": {
     "name": "Ivan Zdravkov",
     "url": "https://github.com/ivan-zdravkov"
