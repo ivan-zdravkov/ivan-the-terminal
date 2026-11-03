@@ -16,4 +16,6 @@
 /plugin install civic@ivan-the-terminal
 ```
 
+Нови версии · *Updates*: `/plugin` → **Marketplaces** → **ivan-the-terminal** → **Enable auto-update**; в claude.ai включете **Sync automatically** на marketplace-а · *on claude.ai, turn on **Sync automatically** for the marketplace*.
+
 Лиценз MIT · част от [ivan-the-terminal](https://github.com/ivan-zdravkov/ivan-the-terminal)

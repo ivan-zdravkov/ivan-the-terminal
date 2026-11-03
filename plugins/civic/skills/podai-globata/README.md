@@ -21,7 +21,7 @@ Claude сам намира датата, часа и мястото, номер�
 Най-лесно е от браузър на компютъра. После умението работи навсякъде, включително в приложението Claude на телефона. Менютата в claude.ai са на английски.
 
 1. На [claude.ai](https://claude.ai) отворете **Settings → Capabilities** и включете **Code execution and file creation**.
-2. Отворете **Customize → Plugins → Add → Add marketplace → Add from a repository**, въведете `ivan-zdravkov/ivan-the-terminal` и потвърдете.
+2. Отворете **Customize → Plugins → Add → Add marketplace → Add from a repository**, въведете `ivan-zdravkov/ivan-the-terminal` и потвърдете. На добавения marketplace включете **Sync automatically**, за да получавате новите версии сами.
 3. В **Discover** изберете **civic** → **Add**. Другите плъгини в списъка не са нужни.
 4. *(Препоръчително)* **Settings → Connectors → Gmail → Connect**, за да получавате готова чернова в Gmail.
 
@@ -31,7 +31,7 @@ Claude сам намира датата, часа и мястото, номер�
 <summary>Други начини: безплатен план (.zip файл), Claude Code, по-точен адрес</summary>
 
 - **Безплатен план (.zip файл):** след стъпка 1 изтеглете **[podai-globata.zip](https://github.com/ivan-zdravkov/ivan-the-terminal/releases/download/podai-globata/podai-globata.zip)** (не го разархивирайте), после **Customize → Skills → „+“ → Create skill → Upload a skill** и изберете файла. Работи на всички планове.
-- **Claude Code:** `/plugin marketplace add ivan-zdravkov/ivan-the-terminal`, после `/plugin install civic@ivan-the-terminal`.
+- **Claude Code:** `/plugin marketplace add ivan-zdravkov/ivan-the-terminal`, после `/plugin install civic@ivan-the-terminal`. За обновления: `/plugin` → **Marketplaces** → **ivan-the-terminal** → **Enable auto-update**.
 - **По-точен адрес:** в настройките на Code execution разрешете мрежов достъп до `nominatim.openstreetmap.org` и `overpass-api.de` (картите на OpenStreetMap). Без това Claude чете адреса от табелите на снимката или ви пита.
 
 </details>
@@ -165,7 +165,13 @@ Claude сам намира датата, часа и мястото, номер�
 <details>
 <summary><b>Как да обновя умението?</b></summary>
 
-Инсталацията през **Plugins** (от GitHub) и Claude Code се обновяват сами; ако не виждате промяна, премахнете и добавете плъгина отново. Качен .zip файл не се обновява сам: изтрийте умението от **Customize → Skills** и качете отново файла от същия линк. За известия за нова версия: в GitHub **Watch → Custom → Releases**.
+Зависи как сте го инсталирали. Версията, която имате, е на страницата на плъгина, например „Civic 0.2.0“.
+
+- **Plugins (claude.ai):** обновленията идват само от marketplace-а. В **Customize → Plugins** отворете marketplace-а **ivan-the-terminal** и включете **Sync automatically**; за обновяване веднага изберете **Check for updates**. Направете го в claude.ai в браузър или в приложението за компютър, после затворете и отворете отново приложението на телефона. Ако плъгинът още показва старата версия, премахнете го и го добавете отново.
+- **Claude Code:** автоматичното обновяване е изключено за marketplace-и извън тези на Anthropic. Включете го веднъж: `/plugin` → **Marketplaces** → **ivan-the-terminal** → **Enable auto-update**. За обновяване веднага: **Update marketplace** на същото място, после `/reload-plugins`.
+- **Качен .zip файл:** никога не се обновява сам. Изтрийте умението от **Customize → Skills** и качете отново файла от същия линк.
+
+За известия за нова версия: в GitHub **Watch → Custom → Releases**.
 
 </details>
 

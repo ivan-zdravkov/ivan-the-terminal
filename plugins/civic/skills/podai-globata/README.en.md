@@ -21,7 +21,7 @@ Claude finds the date, time and place, the plate and make, the violations with t
 Easiest from a desktop browser. After that the skill works everywhere, including the Claude phone app.
 
 1. On [claude.ai](https://claude.ai), open **Settings → Capabilities** and turn on **Code execution and file creation**.
-2. Open **Customize → Plugins → Add → Add marketplace → Add from a repository**, enter `ivan-zdravkov/ivan-the-terminal` and confirm.
+2. Open **Customize → Plugins → Add → Add marketplace → Add from a repository**, enter `ivan-zdravkov/ivan-the-terminal` and confirm. On the added marketplace, turn on **Sync automatically**, so new versions arrive on their own.
 3. In **Discover**, pick **civic** → **Add**. The other plugins in the list aren't needed.
 4. *(Recommended)* **Settings → Connectors → Gmail → Connect**, to get a ready draft in Gmail.
 
@@ -31,7 +31,7 @@ Done. On a phone, close and reopen the Claude app. Plugins need a paid plan (Pro
 <summary>Other ways: free plan (.zip file), Claude Code, more accurate addresses</summary>
 
 - **Free plan (.zip file):** after step 1, download **[podai-globata.zip](https://github.com/ivan-zdravkov/ivan-the-terminal/releases/download/podai-globata/podai-globata.zip)** (don't unzip it), then **Customize → Skills → „+“ → Create skill → Upload a skill** and pick the file. Works on every plan.
-- **Claude Code:** `/plugin marketplace add ivan-zdravkov/ivan-the-terminal`, then `/plugin install civic@ivan-the-terminal`.
+- **Claude Code:** `/plugin marketplace add ivan-zdravkov/ivan-the-terminal`, then `/plugin install civic@ivan-the-terminal`. For updates: `/plugin` → **Marketplaces** → **ivan-the-terminal** → **Enable auto-update**.
 - **More accurate addresses:** in the Code execution settings, allow network access to `nominatim.openstreetmap.org` and `overpass-api.de` (OpenStreetMap). Without it, Claude reads the address from street signs in the photo or asks you.
 
 </details>
@@ -165,7 +165,13 @@ It never installs or runs on your phone: Claude uses it in its own sandbox. No e
 <details>
 <summary><b>How do I update?</b></summary>
 
-The **Plugins** (GitHub) install and Claude Code update themselves; if you don't see a change, remove and re-add the plugin. An uploaded .zip doesn't: delete the skill in **Customize → Skills** and upload the file again from the same link. To hear about new versions: on GitHub, **Watch → Custom → Releases**.
+It depends on how you installed it. The version you have is on the plugin's page, e.g. „Civic 0.2.0“.
+
+- **Plugins (claude.ai):** updates come only from the marketplace. In **Customize → Plugins**, open the **ivan-the-terminal** marketplace and turn on **Sync automatically**; to update right now, choose **Check for updates**. Do this on claude.ai in a browser or in the desktop app, then close and reopen the app on your phone. If the plugin still shows the old version, remove it and add it again.
+- **Claude Code:** auto-update is off for marketplaces outside Anthropic. Turn it on once: `/plugin` → **Marketplaces** → **ivan-the-terminal** → **Enable auto-update**. To update right now: **Update marketplace** in the same place, then `/reload-plugins`.
+- **Uploaded .zip:** never updates itself. Delete the skill in **Customize → Skills** and upload the file again from the same link.
+
+To hear about new versions: on GitHub, **Watch → Custom → Releases**.
 
 </details>
 
