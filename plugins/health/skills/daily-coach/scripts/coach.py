@@ -146,7 +146,8 @@ def parse_time(s):
 
 
 def parse_value(s):
-    m = re.match(r"^\s*(-?\d+(?:[.,]\d+)?)\s*(\S.*)?$", s or "")
+    s = re.sub(r"(?<=\d)[\s  ](?=\d{3}(?!\d))", "", s or "")  # "12 345" steps in a Bulgarian locale
+    m = re.match(r"^\s*(-?\d+(?:[.,]\d+)?)\s*(\S.*)?$", s)
     if not m:
         return None, (s or "").strip()
     return float(m.group(1).replace(",", ".")), ""

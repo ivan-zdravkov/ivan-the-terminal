@@ -5,6 +5,10 @@ HEALTH_REPO="~/Repositories/<private-repo>"   # a local clone of the repo the iP
                                      # absolute, ~/..., or relative to this file's real folder (e.g. "../../..")
 HEALTH_DIR="health"                  # the folder in that repo (health/YYYY/MM/*.txt)
 HEALTH_REF="origin/main"             # read from here after `git fetch`; the clone's working tree is never touched
+RING_APP="com.example.ringapp"       # bundle id of the ring app the iPhone shortcut opens (empty: don't open one)
+RING_APP_NAME="Ring"
+HEALTH_TYPES=""                      # Health types the shortcut reads (empty: Sleep, Heart Rate, Heart Rate
+                                     # Variability, Blood Oxygen, Steps); see references/iphone-health-sync.md
 DAY_START_HOUR=4                     # before 04:00 still counts as the previous day (night wake-ups)
 AUTO_PLAN_HOUR=6                     # start checking for last night's sleep at this hour, every 15 min
 PLAN_BY="10:30"                      # make the plan by then even without ring data

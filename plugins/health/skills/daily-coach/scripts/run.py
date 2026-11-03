@@ -7,6 +7,7 @@
   run.py --import        only import new Health sync files and print what arrived
   run.py --dry-run       assemble prompt + command and print a summary; runs nothing
   run.py --install-task  Windows: register that schedule in Task Scheduler (Linux: daily-coach.timer)
+  run.py --shortcut      build and sign the iPhone's "Health sync" shortcut (sends it to a signing service)
 Private config: ~/.config/ivan-the-terminal/daily-coach/{config.env,profile.md} (see ../config.example)
 Stdlib only; Linux and Windows. On Windows the run's Bash tool is Git Bash, which Claude Code needs anyway.
 """
@@ -149,6 +150,16 @@ def main(argv):
         return 2
     if mode == "--install-task":
         return install_task(cfg["AUTO_PLAN_HOUR"], cfg["PLAN_BY"])
+    if mode == "--shortcut":  # the iPhone's Health sync shortcut, built from config and signed (see shortcut.py)
+        STATE.mkdir(parents=True, exist_ok=True)
+        xml, signed = STATE / "health-sync.xml", STATE / "Health sync.shortcut"
+        for step in (["build", xml], ["sign", xml, signed]):
+            r = subprocess.run([str(PY), "-I", "-X", "utf8", str(TOOLS / "shortcut.py"), *map(str, step)],
+                               creationflags=NO_WINDOW)
+            if r.returncode:
+                return r.returncode
+        print(f"Open it on the iPhone (AirDrop, or mail it to yourself): {signed}")
+        return 0
 
     for d in (STATE / "work", STATE / "logs"):
         d.mkdir(parents=True, exist_ok=True)
