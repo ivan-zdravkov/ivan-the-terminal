@@ -243,6 +243,9 @@ class GuardTest(unittest.TestCase):
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach context"}), 2)  # pre-.py name
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py notify"}), 2)  # the runner pushes, not the model
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py context; rm -rf ~"}), 2)
+        self.assertEqual(self.run_guard("Bash", {"command": "date +%F"}), 0)
+        for cmd in ("date $'\\'' ; id ; echo #'", "date -f /etc/passwd", "date --file=/etc/passwd", "date -r /etc/passwd"):
+            self.assertEqual(self.run_guard("Bash", {"command": cmd}), 2, cmd)
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py status#;/t/coach.py url"}), 2)  # mid-word '#'
         self.assertEqual(self.run_guard("Bash", {"command": "/t/coach.py status $(id)"}), 2)
         self.assertEqual(self.run_guard("Bash", {"command": "python3 -c 1"}), 2)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """webapp: what turns a stdlib skill server into a home-screen app on a phone. Stdlib plus the openssl CLI.
 
-Used by daily-coach (coach.py) and job-digest (jobs.py). Every URL is relative, so an app works under any prefix.
+Used by daily-coach (coach.py); job-digest uses only env(). Every URL is relative, so an app works under any prefix.
   env(path, defaults)        KEY="value" config file -> dict
   token(configured, dir)     the secret path prefix: from config, else generated once into the data dir
   AppHandler, serve(...)     token-gated HTTP handler base (security headers) and a multi-address server

@@ -6,7 +6,7 @@
 - WebFetch: https only, and only WEB_DOMAINs (and their subdomains) when any are given, so an injected page
   can't make the run send health data to another host
 - Write/Edit: only files inside WORK_DIR
-- Bash: a single `TOOLS_DIR/coach.py <context|plan-set|has-plan|status> ...` or `date`; no chaining or substitution
+- Bash: a single `TOOLS_DIR/coach.py <context|plan-set|has-plan|status> ...` or `date [+FORMAT]`; no chaining, substitution or `$`
 """
 import json
 import re
@@ -41,8 +41,8 @@ def check(tools_dir, work, event, domains=()):
             block(f"Write/Edit only inside {work}")
     elif tool == "Bash":
         cmd = args.get("command", "")
-        if re.search(r"[`\n]|\$[({]", cmd):
-            block("no command substitution or multi-line commands")
+        if re.search(r"[`\n$]", cmd):  # no `$`: bash's $'..' quoting reads \' differently from shlex
+            block("no $, command substitution or multi-line commands")
         lexer = shlex.shlex(cmd, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
         lexer.commenters = ""  # shlex ends a word at a mid-word '#'; bash doesn't: `x#;y` would hide `;y`
@@ -50,6 +50,8 @@ def check(tools_dir, work, event, domains=()):
         if not words or any(set(w) <= set("();<>|&") for w in words):
             block("one plain command per call: no pipes, chaining or redirects")
         if words[0] == "date":
+            if len(words) > 2 or (len(words) == 2 and not words[1].startswith("+")):
+                block("date takes at most a +FORMAT (date -f/-r would read files)")
             return
         if words[0] != str(Path(tools_dir) / "coach.py") or len(words) < 2 or words[1] not in SUBCOMMANDS:
             block(f"Bash may only run {Path(tools_dir) / 'coach.py'} {sorted(SUBCOMMANDS)} or date")

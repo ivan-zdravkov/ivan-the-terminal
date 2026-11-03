@@ -1,14 +1,15 @@
 """PreToolUse guard for the headless job digest. Fails closed: any error blocks the call.
 
-  guard.py TOOLS_DIR WORK_DIR
+  guard.py TOOLS_DIR WORK_DIR RECIPIENT...
 
-- send_message / reply / forward: never. The digest goes to the Jobs app; replies are drafts the candidate sends
+- send_message: only to RECIPIENT(s), only known fields; never draftId (that sends a stored draft as-is)
+- reply / forward / update_draft: never. Replies to recruiters are drafts the candidate sends
 - create_draft: no attachments (the candidate attaches the CV by hand)
 - label_* / unlabel_thread: never TRASH/SPAM; unlabel may only remove INBOX/UNREAD (archive)
 - Write/Edit: only files inside WORK_DIR
-- Bash: a single call to a helper in TOOLS_DIR (fetch.py, q.py, page.py, jobs.py history|digest-set|has-digest)
-  or `date`;
-  no chaining, redirects or substitution
+- PowerShell, Monitor: never
+- Bash: a single call to a helper in TOOLS_DIR (fetch.py, q.py, page.py) or `date [+FORMAT]`;
+  no chaining, redirects, substitution or `$`. TOOLS_DIR is written with forward slashes, also on Windows
 """
 import json
 import re
@@ -16,9 +17,9 @@ import shlex
 import sys
 from pathlib import Path
 
+SEND_FIELDS = {"to", "cc", "bcc", "subject", "body", "htmlBody", "html_body", "includeSignature"}
 SYSTEM_LABELS = {"TRASH", "SPAM"}
 HELPERS = ("fetch.py", "q.py", "page.py")
-JOBS = {"history", "digest-set", "has-digest"}
 
 
 def block(reason):
@@ -26,11 +27,29 @@ def block(reason):
     sys.exit(2)
 
 
-def check(tools_dir, work, event):
+def addresses(value):
+    items = value if isinstance(value, list) else [value] if value else []
+    out = []
+    for item in items:
+        if not isinstance(item, str):
+            block("recipients must be strings")
+        for part in item.split(","):
+            m = re.search(r"<([^<>]+)>\s*$", part)
+            out.append((m.group(1) if m else part).strip().lower())
+    return [a for a in out if a]
+
+
+def check(tools_dir, work, allowed, event):
     tool = event.get("tool_name", "")
     args = event.get("tool_input") or {}
-    if tool.endswith(("__send_message", "__reply", "__forward", "__update_draft")):
-        block("this run sends no email: the digest is stored for the Jobs app, and replies are drafts")
+    if tool.endswith("__send_message"):
+        if args.get("draftId") or set(args) - SEND_FIELDS:
+            block(f"send_message only with {sorted(SEND_FIELDS)}; drafts are sent by the candidate, never here")
+        recipients = [a for key in ("to", "cc", "bcc") for a in addresses(args.get(key))]
+        if not allowed or not recipients or any(r not in allowed for r in recipients):
+            block("send_message may only go to the digest recipient. Use create_draft for anything else.")
+    elif tool.endswith(("__reply", "__forward", "__update_draft")):
+        block("the only mail this run sends is the digest; replies to recruiters are drafts")
     elif tool.endswith("__create_draft"):
         if args.get("attachments"):
             block("drafts carry no attachments; the candidate attaches the CV before sending")
@@ -41,34 +60,36 @@ def check(tools_dir, work, event):
         if SYSTEM_LABELS & set(labels):
             block("TRASH/SPAM are off limits")
         if tool.endswith("__unlabel_thread") and not set(labels) <= {"INBOX", "UNREAD"}:
-            block("unlabel_thread may only remove INBOX/UNREAD (archive job alerts)")
+            block("unlabel_thread may only remove INBOX/UNREAD (archive)")
     elif tool in ("Write", "Edit"):
         path = Path(str(args.get("file_path", ""))).resolve()
         if Path(work).resolve() not in path.parents:
             block(f"Write/Edit only inside {work}")
+    elif tool in ("PowerShell", "Monitor"):
+        block(f"{tool} is not available to this run")
     elif tool == "Bash":
         cmd = args.get("command", "")
-        if re.search(r"[`\n]|\$[({]", cmd):
-            block("no command substitution or multi-line commands")
+        if re.search(r"[`\n$]", cmd):  # no `$`: bash's $'..' quoting reads \' differently from shlex
+            block("no $, command substitution or multi-line commands")
         lexer = shlex.shlex(cmd, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
         lexer.commenters = ""  # shlex ends a word at a mid-word '#'; bash doesn't: `x#;y` would hide `;y`
         words = list(lexer)
         if not words or any(set(w) <= set("();<>|&") for w in words):
             block("one plain command per call: no pipes, chaining or redirects")
-        exe = words[0]
-        if exe == str(Path(tools_dir) / "jobs.py"):
-            if len(words) < 2 or words[1] not in JOBS:
-                block(f"jobs.py may only run {sorted(JOBS)}")
-            return
-        helpers = {str(Path(tools_dir) / n) for n in HELPERS}
-        if exe not in helpers and exe != "date":
-            block(f"Bash may only run {sorted(helpers)}, jobs.py {sorted(JOBS)} or date")
+        helpers = {f"{tools_dir.rstrip('/')}/{n}" for n in HELPERS}
+        if words[0] == "date":
+            if len(words) > 2 or (len(words) == 2 and not words[1].startswith("+")):
+                block("date takes at most a +FORMAT (date -f/-r would read files)")
+        elif words[0] not in helpers:
+            block(f"Bash may only run {sorted(helpers)} or date")
 
 
 def main():
     try:
-        check(sys.argv[1], sys.argv[2], json.load(sys.stdin))
+        tools_dir, work = sys.argv[1], sys.argv[2]
+        allowed = {a.strip().lower() for a in sys.argv[3:] if a.strip()}
+        check(tools_dir, work, allowed, json.load(sys.stdin))
     except SystemExit:
         raise
     except Exception as e:  # noqa: BLE001 - fail closed

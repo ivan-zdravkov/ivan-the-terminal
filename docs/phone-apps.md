@@ -1,6 +1,6 @@
 # Phone apps over the tailnet
 
-Some skills publish their results as small web apps that live on the phone's home screen. Today these are **Daily** (daily-coach) and **Jobs** (job-digest).
+Some skills publish their results as small web apps that live on the phone's home screen. Today this is **Daily** (daily-coach). job-digest emails its digest instead.
 They replace emailed digests and app subscriptions. The data stays on the home machine, and the apps can only be reached from inside your tailnet.
 
 ## How it works
@@ -18,18 +18,14 @@ They replace emailed digests and app subscriptions. The data stays on the home m
 1. In the Tailscale admin console, open DNS and enable **MagicDNS** and **HTTPS Certificates**.
    Certificates are logged publicly (Certificate Transparency), so the machine's `*.ts.net` name becomes public. The machine still can't be reached from outside the tailnet.
 2. Let your user manage serve: `sudo tailscale set --operator=$USER`
-3. Publish the apps. The config persists across reboots:
+3. Publish the app. The config persists across reboots:
    ```sh
    tailscale serve --bg --https=443  http://127.0.0.1:8765   # Daily (daily-coach PORT)
-   tailscale serve --bg --https=8443 http://127.0.0.1:8766   # Jobs (job-digest PORT)
    tailscale serve status
    ```
-4. In each skill's private `config.env`, set `BIND="127.0.0.1"` and set `PUBLIC_URL` to the serve address:
-   - Daily: `https://<machine>.<tailnet>.ts.net`
-   - Jobs: the same address with `:8443`
-
-   Then restart the servers: `systemctl --user restart daily-coach-server job-digest-server`.
-5. `itt run daily-coach --dry-run` and `itt run job-digest --dry-run` print the app links. They contain the token, so keep them private.
+4. In the skill's private `config.env`, set `BIND="127.0.0.1"` and set `PUBLIC_URL` to the serve address, `https://<machine>.<tailnet>.ts.net`.
+   Then restart the server: `systemctl --user restart daily-coach-server`.
+5. `itt run daily-coach --dry-run` prints the app link. It contains the token, so keep it private.
 
 ## On the iPhone
 1. Turn on Tailscale. VPN On Demand keeps it connected.
