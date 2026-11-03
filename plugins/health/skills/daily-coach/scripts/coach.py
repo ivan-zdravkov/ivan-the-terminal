@@ -28,13 +28,14 @@ import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 HOME = Path.home()
 CONF = Path(os.environ.get("DAILY_COACH_CONF") or
             Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "ivan-the-terminal/daily-coach/config.env")
 DATA = Path(os.environ.get("DAILY_COACH_DATA") or
             Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")) / "ivan-the-terminal/daily-coach")
-DEFAULTS = {"MAIL_TO": "", "DAY_START_HOUR": "4", "AUTO_PLAN_HOUR": "6", "LEVEL_NAMES": "",
+DEFAULTS = {"MAIL_TO": "", "DAY_START_HOUR": "4", "AUTO_PLAN_HOUR": "6", "LEVEL_NAMES": "", "WEB_DOMAINS": "",
             "HEALTH_REPO": "", "HEALTH_DIR": "health", "HEALTH_REF": "origin/main"}
 _spec = importlib.util.spec_from_file_location("envfile", Path(__file__).resolve().parents[5] / "tools/envfile.py")
 envfile = importlib.util.module_from_spec(_spec)
@@ -385,6 +386,28 @@ def clean(s, n):
     return re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", str(s)).strip()[:n]
 
 
+LINKISH = re.compile(r"(?i)://|www\.|\b[a-z0-9-]{2,}\.[a-z]{2,}\b")
+
+
+def text(s, n):
+    """Plan text goes into an email, where mail clients turn URLs and bare domains into links. The only link a plan
+    may carry is the recipe's, on a WEB_DOMAINS site: anything else could carry data out of the run."""
+    s = clean(s, n)
+    if LINKISH.search(s):
+        raise ValueError(f"no links or domain names in plan text (only recipe.url): {s[:60]!r}")
+    return s
+
+
+def recipe_url(url):
+    u = urlparse(str(url))
+    host, domains = (u.hostname or "").lower(), CFG["WEB_DOMAINS"].lower().split()
+    if u.scheme != "https" or not host:
+        raise ValueError("recipe.url must be an https:// URL")
+    if not any(host == d or host.endswith("." + d) for d in domains):
+        raise ValueError(f"recipe.url must be on a WEB_DOMAINS site: {sorted(domains)}")
+    return clean(url, 500)
+
+
 def validate(plan, day):
     if not isinstance(plan, dict):
         raise ValueError("plan must be a JSON object")
@@ -408,13 +431,13 @@ def validate(plan, day):
         if not isinstance(xp, int) or not 0 <= xp <= 50:
             raise ValueError(f"{it['id']}: xp must be an int 0-50")
         seen.add(it["id"])
-        o = {"id": it["id"], "kind": it["kind"], "label": clean(it.get("label", ""), 160), "xp": xp,
-             "cat": clean(it.get("cat", ""), 16), "core": bool(it.get("core"))}
+        o = {"id": it["id"], "kind": it["kind"], "label": text(it.get("label", ""), 160), "xp": xp,
+             "cat": text(it.get("cat", ""), 16), "core": bool(it.get("core"))}
         if not o["label"]:
             raise ValueError(f"{it['id']}: label required")
         for k, n in (("hint", 300), ("unit", 12)):
             if it.get(k):
-                o[k] = clean(it[k], n)
+                o[k] = text(it[k], n)
         if it.get("metric"):
             if not ID.match(str(it["metric"])):
                 raise ValueError(f"{it['id']}: metric must match {ID.pattern}")
@@ -423,14 +446,14 @@ def validate(plan, day):
     out = {"date": day.isoformat(), "readiness": plan["readiness"], "items": out_items}
     for k, n in (("headline", 120), ("why", 600), ("tip", 400), ("weekly", 900), ("ack", 300)):
         if plan.get(k):
-            out[k] = clean(plan[k], n)
+            out[k] = text(plan[k], n)
     if plan.get("recipe"):
         r = plan["recipe"]
-        if not isinstance(r, dict) or not str(r.get("url", "")).startswith("https://") or not r.get("title"):
-            raise ValueError("recipe needs title and an https:// url")
-        out["recipe"] = {"title": clean(r["title"], 120), "url": clean(r["url"], 500),
-                         "why": clean(r.get("why", ""), 300), "time_min": int(r.get("time_min") or 0),
-                         "shopping": [clean(x, 60) for x in (r.get("shopping") or [])[:12]]}
+        if not isinstance(r, dict) or not r.get("title"):
+            raise ValueError("recipe needs a title and an https:// url")
+        out["recipe"] = {"title": text(r["title"], 120), "url": recipe_url(r.get("url")),
+                         "why": text(r.get("why", ""), 300), "time_min": int(r.get("time_min") or 0),
+                         "shopping": [text(x, 60) for x in (r.get("shopping") or [])[:12]]}
     return out
 
 
@@ -614,7 +637,7 @@ def email(con, day=None):
              f" · {xp['xp_this_week']} XP this week (last week {xp['xp_last_week']})")
     comeback = "Comeback day: do the ★ items and you get +20 bonus XP." if xp["yesterday_missed"] else ""
     head = f"{READINESS[plan['readiness']]} {plan.get('headline', 'Your plan')}"
-    subject = f"{SUBJECT} {day.isoformat()}: {head}"
+    subject = " ".join(f"{SUBJECT} {day.isoformat()}: {head}".split())  # one header line
 
     def entry(it):
         star = "★ " if it["core"] else ""

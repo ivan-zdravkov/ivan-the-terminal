@@ -8,7 +8,7 @@ HEALTH_REF="origin/main"             # read from here after `git fetch`; the clo
 DAY_START_HOUR=4                     # before 04:00 still counts as the previous day (night wake-ups)
 AUTO_PLAN_HOUR=6                     # start checking for last night's sleep at this hour, every 15 min
 PLAN_BY="10:30"                      # make the plan by then even without ring data
-WEB_DOMAINS=""                       # recipe sites the run may WebFetch, space-separated (empty = any https site)
+WEB_DOMAINS="<recipe-site.example>"  # required: the only sites the run may WebFetch and link a recipe from
 LEVEL_NAMES=""                       # optional, comma-separated names for levels 1, 2, 3, ...
 
 # ~/.config/ivan-the-terminal/daily-coach/profile.md   (inserted into the morning prompt as PROFILE)

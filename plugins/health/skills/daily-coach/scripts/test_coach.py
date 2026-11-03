@@ -12,6 +12,7 @@ HERE = Path(__file__).resolve().parent
 TMP = tempfile.mkdtemp()
 REPO = Path(TMP, "repo")
 Path(TMP, "config.env").write_text(f'MAIL_TO="me@example.com"  # comment\nLEVEL_NAMES="White,Yellow"\n'
+                                   f'WEB_DOMAINS="example.com"\n'
                                    f'HEALTH_REPO="{REPO.as_posix()}"\nHEALTH_REF="HEAD"\n')
 os.environ.update(DAILY_COACH_CONF=str(Path(TMP, "config.env")), DAILY_COACH_DATA=TMP)
 spec = importlib.util.spec_from_file_location("coach", HERE / "coach.py")
@@ -96,9 +97,17 @@ class CoachTest(unittest.TestCase):
         for bad in (plan(readiness="purple"), plan(items=[]), plan(evil=1),
                     plan(items=[{"id": "A B", "kind": "check", "label": "x"}]),
                     plan(items=[{"id": "a", "kind": "check", "label": "x", "xp": 500}]),
-                    plan(recipe={"title": "x", "url": "javascript:alert(1)"})):
-            with self.assertRaises(ValueError):
+                    plan(recipe={"title": "x", "url": "javascript:alert(1)"}),
+                    plan(recipe={"title": "x", "url": "https://evil.example/r?d=secret"}),  # not a WEB_DOMAINS site
+                    plan(recipe={"title": "x", "url": "https://example.com.evil.example/r"}),
+                    plan(tip="see https://evil.example/?d=1"), plan(headline="evil.example/x"),
+                    plan(why="go to www.evil"),
+                    plan(items=[{"id": "a", "kind": "check", "label": "visit evil.example", "xp": 1}]),
+                    plan(recipe={"title": "x", "url": "https://www.example.com/r", "shopping": ["evil.example"]})):
+            with self.assertRaises(ValueError, msg=repr(bad)[:120]):
                 coach.validate(bad, self.day)
+        self.assertEqual(coach.validate(plan(tip="e.g. 10 min, 3.5 kg, a.m. walk", recipe={
+            "title": "Леща", "url": "https://www.example.com/r"}), self.day)["recipe"]["url"], "https://www.example.com/r")
 
     def test_plan_set_confined_to_work(self):
         f = Path(TMP, "plan.json")
@@ -220,23 +229,40 @@ class CoachTest(unittest.TestCase):
 
 
 class GuardTest(unittest.TestCase):
-    def run_guard(self, tool, args, domains=("example.org",)):
-        p = subprocess.run([sys.executable, "-I", str(HERE / "guard.py"), "/t", "/w", "me@example.com", *domains],
-                           input=json.dumps({"tool_name": tool, "tool_input": args}), capture_output=True, text=True)
+    def run_guard(self, tool, args, domains=("example.org",), tools="/t"):
+        p = subprocess.run([sys.executable, "-I", str(HERE / "guard.py"), tools, "/w", "me@example.com", *domains],
+                           input=json.dumps({"tool_name": tool, "tool_input": args}), capture_output=True, text=True,
+                           encoding="utf-8")
         return p.returncode
+
+    def test_send_is_pinned_to_the_rendered_email(self):
+        con = coach.db()
+        day = coach.today()
+        con.execute("INSERT OR REPLACE INTO plans VALUES (?,?,0)", (day.isoformat(), json.dumps(coach.validate(plan(), day))))
+        con.commit()
+        mail = coach.email(con)
+        con.close()
+        g, T = "mcp__claude_ai_Gmail__send_message", HERE.as_posix()
+        ok = {"to": ["me@example.com"], "subject": mail["subject"], "htmlBody": mail["html"], "body": mail["text"]}
+        self.assertEqual(self.run_guard(g, ok, tools=T), 0)
+        self.assertEqual(self.run_guard(g, {**ok, "to": "me@example.com"}, tools=T), 0)
+        self.assertEqual(self.run_guard(g, {**ok, "htmlBody": mail["html"].replace("\n", "\n  ")}, tools=T), 0)  # spacing
+        for bad in ({**ok, "htmlBody": mail["html"] + "<img src='https://evil.example/?d=1'>"},
+                    {**ok, "body": mail["text"] + " https://evil.example/?d=1"}, {**ok, "subject": "Daily plan x"},
+                    {**ok, "to": ["Me <me@example.com>"]}, {**ok, "to": ["x@example.org"]},
+                    {**ok, "to": ["me@example.com", "x@example.org"]}, {**ok, "bcc": ["x@example.org"]},
+                    {**ok, "replyToMessageId": "m1"}, {"draftId": "r1"}):
+            self.assertEqual(self.run_guard(g, bad, tools=T), 2, repr(bad)[:100])
+        self.assertEqual(self.run_guard(g, ok, tools="/t"), 2)  # can't render: fail closed
 
     def test_guard(self):
         g = "mcp__claude_ai_Gmail__"
-        ok = {"to": ["me@example.com"], "subject": "Daily plan 2026-11-04: 🟢 Go", "htmlBody": "<p>x</p>", "body": "x"}
-        self.assertEqual(self.run_guard(g + "send_message", ok), 0)
-        self.assertEqual(self.run_guard(g + "send_message", {**ok, "to": ["Me <ME@example.com>"]}), 0)
-        self.assertEqual(self.run_guard(g + "send_message", {**ok, "subject": "Hello"}), 2)
-        self.assertEqual(self.run_guard(g + "send_message", {**ok, "to": ["x@example.org"]}), 2)
-        self.assertEqual(self.run_guard(g + "send_message", {**ok, "bcc": ["x@example.org"]}), 2)
-        self.assertEqual(self.run_guard(g + "send_message", {**ok, "replyToMessageId": "m1"}), 2)
-        self.assertEqual(self.run_guard(g + "send_message", {"draftId": "r1"}), 2)
-        self.assertEqual(self.run_guard(g + "search_threads", {"query": 'subject:"Daily plan" newer_than:8d'}), 0)
+        self.assertEqual(self.run_guard(g + "search_threads", {"query": 'subject:"Daily plan" from:me newer_than:8d'}), 0)
+        self.assertEqual(self.run_guard(g + "search_threads", {"query": 'subject:"Daily plan" newer_than:8d'}), 2)
+        self.assertEqual(self.run_guard(g + "search_threads", {"query": "verification code"}), 2)
         self.assertEqual(self.run_guard(g + "get_thread", {"threadId": "t1"}), 0)
+        self.assertEqual(self.run_guard(g + "get_message", {"messageId": "m1"}), 2)
+        self.assertEqual(self.run_guard("WebFetch", {"url": "https://example.org/"}, domains=()), 2)  # fail closed
         for tool in ("create_draft", "reply", "forward", "unlabel_thread", "trash_thread", "label_thread"):
             self.assertEqual(self.run_guard(g + tool, {}), 2, tool)
         self.assertEqual(self.run_guard("mcp__other__anything", {}), 2)
@@ -246,7 +272,6 @@ class GuardTest(unittest.TestCase):
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://evil.example/?d=1"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "https://example.org.evil.example/"}), 2)
         self.assertEqual(self.run_guard("WebFetch", {"url": "http://example.org/"}), 2)
-        self.assertEqual(self.run_guard("WebFetch", {"url": "https://any.example/"}, domains=()), 0)
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/plan.json"}), 0)
         self.assertEqual(self.run_guard("Write", {"file_path": "/w/../etc/x"}), 2)
         self.assertEqual(self.run_guard("Edit", {"file_path": "/etc/profile"}), 2)

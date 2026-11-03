@@ -20,6 +20,9 @@ from pathlib import Path
 SEND_FIELDS = {"to", "cc", "bcc", "subject", "body", "htmlBody", "html_body", "includeSignature"}
 SYSTEM_LABELS = {"TRASH", "SPAM"}
 HELPERS = ("fetch.py", "q.py", "page.py")
+# Anything a mail client fetches on open would carry data out without a click (tracking-pixel style)
+REMOTE = re.compile(r"(?i)<\s*(img|image|link|style|iframe|frame|object|embed|video|audio|source|svg|form|meta|base)\b"
+                    r"|\b(src|srcset|background|poster)\s*=|url\s*\(|@import")
 
 
 def block(reason):
@@ -28,15 +31,11 @@ def block(reason):
 
 
 def addresses(value):
+    """Plain addresses only: a display name or <...> part is refused rather than parsed."""
     items = value if isinstance(value, list) else [value] if value else []
-    out = []
-    for item in items:
-        if not isinstance(item, str):
-            block("recipients must be strings")
-        for part in item.split(","):
-            m = re.search(r"<([^<>]+)>\s*$", part)
-            out.append((m.group(1) if m else part).strip().lower())
-    return [a for a in out if a]
+    if not all(isinstance(i, str) and re.fullmatch(r"[^\s<>,;\"]+@[^\s<>,;\"]+", i.strip()) for i in items):
+        block("recipients must be plain addresses, one per entry")
+    return [i.strip().lower() for i in items]
 
 
 def check(tools_dir, work, allowed, event):
@@ -48,6 +47,8 @@ def check(tools_dir, work, allowed, event):
         recipients = [a for key in ("to", "cc", "bcc") for a in addresses(args.get(key))]
         if not allowed or not recipients or any(r not in allowed for r in recipients):
             block("send_message may only go to the digest recipient. Use create_draft for anything else.")
+        if any(REMOTE.search(str(args.get(k) or "")) for k in ("htmlBody", "html_body", "body")):
+            block("the digest is text and links only: no images, styles, frames or other remote content")
     elif tool.endswith(("__reply", "__forward", "__update_draft")):
         block("the only mail this run sends is the digest; replies to recruiters are drafts")
     elif tool.endswith("__create_draft"):

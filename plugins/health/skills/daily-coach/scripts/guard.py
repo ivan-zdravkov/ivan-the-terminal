@@ -2,10 +2,10 @@
 
   guard.py TOOLS_DIR WORK_DIR MAIL_TO [WEB_DOMAIN...]
 
-- Gmail: read (search_threads, get_thread, get_message), and send_message only to MAIL_TO with a "Daily plan"
-  subject and known fields. Nothing else: no drafts, labels, replies or forwards. Every other MCP tool is blocked
-- WebFetch: https only, and only WEB_DOMAINs (and their subdomains) when any are given, so an injected page
-  can't make the run send health data to another host
+- Gmail: search_threads only with the one plan-reply query, get_thread, and send_message only with exactly what
+  `coach.py email` renders (to MAIL_TO). Nothing else: no drafts, labels, replies or forwards. Other MCP tools: blocked
+- WebFetch: https only, and only WEB_DOMAINs (and their subdomains, at least one required), so an injected page
+  can't make the run send data to another host
 - Write/Edit: only files inside WORK_DIR
 - PowerShell, Monitor: never
 - Bash: a single `TOOLS_DIR/coach.py <context|checks-set|plan-set|email|has-plan|status> ...` or `date [+FORMAT]`;
@@ -14,14 +14,17 @@
 import json
 import re
 import shlex
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
 SUBCOMMANDS = {"context", "checks-set", "plan-set", "email", "has-plan", "status"}
-GMAIL_READ = {"search_threads", "get_thread", "get_message"}
-SEND_FIELDS = {"to", "cc", "bcc", "subject", "body", "htmlBody", "html_body"}
-SUBJECT = "Daily plan"
+SEND_FIELDS = {"to", "subject", "body", "htmlBody"}
+# The only search: threads with a plan email that the person wrote in. Another query would let an injected page or
+# mail make the run read the rest of the mailbox; thread ids from this search can't be guessed for other threads.
+QUERY = 'subject:"Daily plan" from:me newer_than:8d'
+SEARCH_FIELDS = {"query", "pageSize", "pageToken", "view"}
 
 
 def block(reason):
@@ -29,16 +32,17 @@ def block(reason):
     sys.exit(2)
 
 
-def addresses(value):
-    items = value if isinstance(value, list) else [value] if value else []
-    out = []
-    for item in items:
-        if not isinstance(item, str):
-            block("recipients must be strings")
-        for part in item.split(","):
-            m = re.search(r"<([^<>]+)>\s*$", part)
-            out.append((m.group(1) if m else part).strip().lower())
-    return [a for a in out if a]
+def squash(s):
+    return " ".join(str(s or "").split())
+
+
+def rendered(tools_dir):
+    """The email exactly as coach.py renders it from the stored plan: what the one send_message must carry."""
+    p = subprocess.run([sys.executable, "-I", "-X", "utf8", f"{tools_dir.rstrip('/')}/coach.py", "email"],
+                       capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if p.returncode:
+        block(f"coach.py email failed: {p.stderr.strip()[:200]}")
+    return json.loads(p.stdout)
 
 
 def check(tools_dir, work, mail_to, event, domains=()):
@@ -47,15 +51,21 @@ def check(tools_dir, work, mail_to, event, domains=()):
     if tool.startswith("mcp__claude_ai_Gmail__"):
         name = tool.rsplit("__", 1)[1]
         if name == "send_message":
-            if args.get("draftId") or set(args) - SEND_FIELDS:
+            # Pinned to coach.py's rendering: the model can't add recipients, links, images or text of its own.
+            if set(args) - SEND_FIELDS:
                 block(f"send_message only with {sorted(SEND_FIELDS)}")
-            recipients = [a for key in ("to", "cc", "bcc") for a in addresses(args.get(key))]
-            if not mail_to or not recipients or any(r != mail_to.lower() for r in recipients):
-                block("send_message may only go to the plan's recipient")
-            if not str(args.get("subject", "")).startswith(SUBJECT):
-                block(f"the plan email's subject starts with {SUBJECT!r} (coach.py email gives it)")
-        elif name not in GMAIL_READ:
-            block(f"Gmail {name}: this run only reads mail and sends the plan")
+            to = args.get("to")
+            if not mail_to or (to != mail_to and to != [mail_to]):
+                block("send_message goes only to the plan's recipient, as `coach.py email` gives it")
+            mail = rendered(tools_dir)
+            if mail.get("to") != mail_to or squash(args.get("subject")) != squash(mail["subject"]) \
+                    or squash(args.get("htmlBody")) != squash(mail["html"]) or squash(args.get("body")) != squash(mail["text"]):
+                block("send exactly what `coach.py email` printed: to, subject, htmlBody = html, body = text")
+        elif name == "search_threads":
+            if set(args) - SEARCH_FIELDS or squash(args.get("query")) != QUERY:
+                block(f"search_threads only with the query {QUERY}")
+        elif name != "get_thread":
+            block(f"Gmail {name}: this run only reads its plan threads and sends the plan")
     elif tool.startswith("mcp__"):
         block(f"{tool}: this run uses no other MCP tools")
     elif tool == "WebFetch":
@@ -63,7 +73,7 @@ def check(tools_dir, work, mail_to, event, domains=()):
         host = (u.hostname or "").lower()
         if u.scheme != "https" or not host:
             block("WebFetch: https URLs only")
-        if domains and not any(host == d or host.endswith("." + d) for d in domains):
+        if not any(host == d or host.endswith("." + d) for d in domains):
             block(f"WebFetch only on the recipe sites {sorted(domains)}")
     elif tool in ("Write", "Edit"):
         path = Path(str(args.get("file_path", ""))).resolve()

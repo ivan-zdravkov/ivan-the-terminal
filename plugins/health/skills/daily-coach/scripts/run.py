@@ -76,8 +76,8 @@ def command(model, settings, work):
     allowed = [*(f"Bash({tools}/coach.py {c}:*)" for c in ("context", "checks-set", "plan-set", "email", "has-plan",
                                                              "status")),
                "Bash(date:*)", f"Read({work_rule})", f"Edit({work_rule})", "WebSearch", "WebFetch",
-               f"{G}__search_threads", f"{G}__get_thread", f"{G}__get_message", f"{G}__send_message"]
-    disallowed = [f"{G}__{t}" for t in ("create_draft", "update_draft", "delete_draft", "reply", "forward",
+               f"{G}__search_threads", f"{G}__get_thread", f"{G}__send_message"]
+    disallowed = [f"{G}__{t}" for t in ("get_message", "create_draft", "update_draft", "delete_draft", "reply", "forward",
                                         "label_thread", "label_message", "unlabel_thread", "unlabel_message",
                                         "trash_message", "trash_thread", "mark_message_spam", "mark_thread_spam")]
     return ["claude", "-p", "--model", model, "--permission-mode", "dontAsk", "--settings", str(settings),
@@ -144,8 +144,8 @@ def main(argv):
         return 0
     cfg = load_envfile().env(CONF / "config.env", DEFAULTS)
     model, to, domains = cfg["MODEL"], cfg["MAIL_TO"].strip(), cfg["WEB_DOMAINS"].lower().split()
-    if not to:
-        print(f"daily-coach: MAIL_TO missing in {CONF}/config.env", file=sys.stderr)
+    if not to or not domains:  # the run reads mail: WebFetch must stay on the recipe sites
+        print(f"daily-coach: set MAIL_TO and WEB_DOMAINS in {CONF}/config.env", file=sys.stderr)
         return 2
     if mode == "--install-task":
         return install_task(cfg["AUTO_PLAN_HOUR"], cfg["PLAN_BY"])
