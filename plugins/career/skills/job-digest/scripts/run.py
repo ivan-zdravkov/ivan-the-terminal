@@ -25,6 +25,9 @@ CONF = Path(os.environ.get("XDG_CONFIG_HOME") or HOME / ".config") / "ivan-the-t
 STATE = Path(os.environ.get("XDG_STATE_HOME") or HOME / ".local/state") / "ivan-the-terminal/job-digest"
 G = "mcp__claude_ai_Gmail"
 DEFAULTS = {"MODEL": "claude-sonnet-5-5", "DIGEST_TO": "", "RUN_AT": "16:15"}
+# The Windows task starts pythonw (no console window), which has no stdio: hooks and children need python.exe
+PY = Path(sys.executable).with_name("python.exe") if Path(sys.executable).name.lower() == "pythonw.exe" \
+    else Path(sys.executable)
 
 
 def load_webapp():
@@ -51,7 +54,7 @@ def prompt_for(work, to):
 
 
 def settings_for(work, to):
-    guard = shlex.join([sys.executable, "-I", TOOLS.joinpath("guard.py").as_posix(), TOOLS.as_posix(),
+    guard = shlex.join([str(PY), "-I", TOOLS.joinpath("guard.py").as_posix(), TOOLS.as_posix(),
                         work.as_posix(), to])  # hooks run in bash, also on Windows (Git Bash)
     return {"hooks": {"PreToolUse": [{"matcher": "Bash|PowerShell|Monitor|Write|Edit|mcp__claude_ai_Gmail__.*",
                                       "hooks": [{"type": "command", "command": guard}]}]}}
@@ -98,7 +101,8 @@ def desktop_notify(title, body):
 
 
 def main(argv):
-    sys.stdout.reconfigure(encoding="utf-8")  # same as the helpers, whatever the Windows code page
+    if sys.stdout:  # None under pythonw (the Windows task)
+        sys.stdout.reconfigure(encoding="utf-8")  # same as the helpers, whatever the Windows code page
     mode = argv[0] if argv else ""
     if not (CONF / "config.env").is_file() or not (CONF / "profile.md").is_file():
         print(f"job-digest: not configured: create {CONF}/config.env and profile.md "
