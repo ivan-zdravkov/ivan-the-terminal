@@ -67,6 +67,7 @@ flowchart LR
 |  | [`rom-sync`](plugins/retro/skills/rom-sync) | mirror systems to a device over adb or to an SD card | ✅ |
 |  | [`add-game`](plugins/retro/skills/add-game/README.md) | a game's launcher → Steam non-Steam game + Apollo/Sunshine app, both with SteamGridDB art; streams on its own virtual display | ✅ |
 |  | [`emulators`](plugins/retro/skills/emulators/README.md) | Xbox 360 / PS3 / Switch emulators (Xenia Canary, RPCS3, Eden) wired to one emulation folder: saves stay there, keys + firmware, 1440p, 60 fps patches and mods, games into Steam + Apollo | ✅ |
+|  | [`game-graphics`](plugins/retro/skills/game-graphics/README.md) | PC games' graphics tuned to your rig and taste: fps tier per genre, FSR 4 / frame gen / OptiScaler, costly settings cut, motion blur off; written into game configs with backups, daily pass for new games | ✅ |
 | [health](plugins/health) | [`daily-coach`](plugins/health/skills/daily-coach) | ring/Apple Health, synced to a private repo with no hands → a tiny gamified daily plan by email; check-ins by replying, XP, seasonal recipe | ✅ |
 
 ## Use it

@@ -1,0 +1,15 @@
+# ~/.config/ivan-the-terminal/game-graphics/config.env
+EXTRA_DIRS="C:\Games"            # ;-separated folders whose subfolders are games (DRM-free, manual installs)
+REPORT_TO="you@example.com"      # the ONLY address the daily run may email (the guard enforces it)
+MODEL="claude-sonnet-5-5"
+RUN_AT="17:30"                   # daily Task Scheduler run (`run.py --install-task`); catches up after the PC was off
+
+# ~/.config/ivan-the-terminal/game-graphics/profile.md  (inserted into the daily prompt; read first in sessions)
+# ## Rig          CPU, GPU + VRAM (upscaler generation: FSR 4 needs RDNA 4), RAM speed, displays (res, Hz, VRR, HDR),
+#                 streaming clients if any (Moonlight/Apollo: resolution and fps follow the client)
+# ## Preferences  fps targets and caps per tier (cinematic / action / competitive / MMO), trade order when short,
+#                 RT stance, kill list (motion blur, DoF, grain...), sharpness, HDR, allowed tools
+#                 (Adrenalin, OptiScaler single-player only, ReShade, Lossless Scaling), autonomy
+# ## Game notes   per-game wishes and feedback ("max view distance in WoW", "too blurry at Balanced")
+#
+# ~/.config/ivan-the-terminal/game-graphics/games/<slug>.json  written by `apply`: the plan last applied per game
