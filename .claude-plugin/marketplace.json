@@ -30,7 +30,7 @@
     {
       "name": "retro",
       "source": "./plugins/retro",
-      "description": "Emulation library care: audit, CHD/RVZ conversion, multi-disc playlists, 50 Hz detection, and device sync over adb or to SD cards; PC games into Steam and Apollo/Sunshine with art.",
+      "description": "Emulation library care: audit, CHD/RVZ conversion, multi-disc playlists, 50 Hz detection, and device sync over adb or to SD cards; PC games into Steam and Apollo/Sunshine with art; PC graphics settings tuned per game (FSR 4, frame gen, OptiScaler) with a daily pass.",
       "category": "entertainment"
     },
     {

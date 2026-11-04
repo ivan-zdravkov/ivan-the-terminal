@@ -1,7 +1,7 @@
 {
   "name": "retro",
-  "version": "0.3.0",
-  "description": "Keep an emulation library tidy and playable: audit (formats, playlists, 50 Hz titles, duplicates, junk), convert to CHD/RVZ, build multi-disc playlists, and sync systems to an Android handheld or SD card. Install and configure Xbox 360, PS3 and Switch emulators around one library (saves, firmware, 1440p, 60 fps patches). Add PC and emulated games to Steam (non-Steam shortcuts) and Apollo/Sunshine for Moonlight, with SteamGridDB art.",
+  "version": "0.4.0",
+  "description": "Keep an emulation library tidy and playable: audit (formats, playlists, 50 Hz titles, duplicates, junk), convert to CHD/RVZ, build multi-disc playlists, and sync systems to an Android handheld or SD card. Install and configure Xbox 360, PS3 and Switch emulators around one library (saves, firmware, 1440p, 60 fps patches). Add PC and emulated games to Steam (non-Steam shortcuts) and Apollo/Sunshine for Moonlight, with SteamGridDB art. Tune PC games' graphics to the rig and the player's taste (fps tiers, FSR 4, frame gen, OptiScaler), with backups and a daily unattended pass for new games.",
   "author": {
     "name": "Ivan Zdravkov",
     "url": "https://github.com/ivan-zdravkov"
@@ -9,5 +9,5 @@
   "homepage": "https://github.com/ivan-zdravkov/ivan-the-terminal",
   "repository": "https://github.com/ivan-zdravkov/ivan-the-terminal",
   "license": "MIT",
-  "keywords": ["emulation", "retro", "roms", "chd", "rvz", "es-de", "adb", "steam", "steamgriddb", "apollo", "sunshine", "moonlight", "xenia", "rpcs3", "eden", "switch", "ps3", "xbox360"]
+  "keywords": ["emulation", "retro", "roms", "chd", "rvz", "es-de", "adb", "steam", "steamgriddb", "apollo", "sunshine", "moonlight", "xenia", "rpcs3", "eden", "switch", "ps3", "xbox360", "graphics", "settings", "fsr", "fsr4", "optiscaler", "frame-generation", "pc-gaming"]
 }
