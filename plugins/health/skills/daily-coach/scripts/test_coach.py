@@ -77,6 +77,14 @@ class CoachTest(unittest.TestCase):
         coach.ingest(self.con, line.format(4000))
         self.assertEqual(coach.ingest(self.con, line.format(9500))["added"], 1)
         self.assertEqual(coach.steps(self.con, p), 9500)
+        coach.ingest(self.con, line.format("12 345"))  # thousands separator in a Bulgarian locale
+        self.assertEqual(coach.steps(self.con, p), 12345)
+
+    def test_parse_value(self):
+        self.assertEqual(coach.parse_value("0,96"), (0.96, ""))
+        self.assertEqual(coach.parse_value("12 345"), (12345.0, ""))
+        self.assertEqual(coach.parse_value("12 345 steps"), (12345.0, ""))
+        self.assertEqual(coach.parse_value("Core"), (None, "Core"))
 
     def test_json_ingest(self):
         body = json.dumps({"samples": [{"type": "Resting Heart Rate", "start": iso(self.day, 7), "end": iso(self.day, 7),

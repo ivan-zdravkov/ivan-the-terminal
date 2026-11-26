@@ -8,6 +8,7 @@ description: Run, tune or debug the daily health coach - ring/Health data synced
 Pieces (all in this skill):
 - `scripts/coach.py`: SQLite store (samples, plans, check-ins, XP), the repo import, the email rendering, CLI.
 - `scripts/run.py`: the import, the morning schedule, and the headless run behind `scripts/guard.py`.
+- `scripts/shortcut.py`: generates and signs the iPhone's "Health sync" shortcut (`run.py --shortcut`), so nobody builds it by hand.
 - `references/prompt.md` (coaching procedure), `references/method.md` (why it works this way, with sources), `references/iphone-health-sync.md` (the phone side, once).
 
 Private:
@@ -35,6 +36,7 @@ Private:
 - **What arrived from the phone:** `itt run daily-coach --import`.
 - **Make or remake today's plan now:** `itt run daily-coach`. It takes a few minutes and sends the email. Re-planning keeps check-ins on matching item ids.
 - **Schedule:** Windows: `itt run daily-coach --install-task` (rerun it after changing `AUTO_PLAN_HOUR` or `PLAN_BY`). Check it with `Get-ScheduledTaskInfo daily-coach`.
+- **Set up or change the iPhone side:** `itt run daily-coach --shortcut` builds and signs the shortcut. Get the printed `.shortcut` file to the phone (mail it to Ivan as an attachment), then follow `references/iphone-health-sync.md` steps 3-4. The token is typed on the phone at import: never put it in config, a file or a mail.
 - **No ring data / no files in the repo:** walk through `references/iphone-health-sync.md`. If `UNKNOWN type` lines show up, add the name to `METRICS` in `coach.py` (another locale or app), then import again.
 - **"Too much" / "too easy" / new goal or constraint:** a reply to the plan email works, and so does editing the private `profile.md` (goals, equipment, constraints, recipe sites). Change `references/prompt.md` only for generic method changes, and ship those via ship-public.
 - **Debug a run:** read the newest log in `~/.local/state/ivan-the-terminal/daily-coach/logs/`. Exit code 3 means it finished without storing a plan.
