@@ -1,5 +1,4 @@
 import importlib.util
-import io
 import os
 import plistlib
 import tempfile
@@ -90,13 +89,20 @@ class ShortcutTest(unittest.TestCase):
     def test_sign_checks_the_answer(self):
         xml, signed = Path(TMP, "s.xml"), Path(TMP, "s.shortcut")
         xml.write_text("<plist/>", encoding="utf-8")
-        with mock.patch.object(shortcut.urllib.request, "urlopen", return_value=io.BytesIO(b"<html>error</html>")):
-            with self.assertRaises(ValueError):
-                shortcut.sign(xml, signed)
+        def curl(stdout, code=0):
+            return mock.patch.object(shortcut.subprocess, "run",
+                                     return_value=mock.Mock(stdout=stdout, stderr=b"", returncode=code))
+        with curl(b"<html>home page</html>"), self.assertRaises(ValueError):
+            shortcut.sign(xml, signed)
+        with curl(b"AEA1partial", code=28), self.assertRaises(ValueError):  # timed out
+            shortcut.sign(xml, signed)
         self.assertFalse(signed.exists())
-        with mock.patch.object(shortcut.urllib.request, "urlopen", return_value=io.BytesIO(b"AEA1signed")):
+        with curl(b"AEA1signed") as run:
             self.assertEqual(shortcut.sign(xml, signed), 10)
         self.assertEqual(signed.read_bytes(), b"AEA1signed")
+        argv = run.call_args.args[0]
+        self.assertEqual((argv[0], argv[-1]), ("curl", shortcut.HUBSIGN))
+        self.assertIn("shortcutName=Healthsync", argv)  # the service fails on a space
 
 
 if __name__ == "__main__":

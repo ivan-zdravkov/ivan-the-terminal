@@ -154,8 +154,10 @@ def main(argv):
         STATE.mkdir(parents=True, exist_ok=True)
         xml, signed = STATE / "health-sync.xml", STATE / "Health sync.shortcut"
         for step in (["build", xml], ["sign", xml, signed]):
+            # captured and reprinted: a CREATE_NO_WINDOW child can't write to the caller's console
             r = subprocess.run([str(PY), "-I", "-X", "utf8", str(TOOLS / "shortcut.py"), *map(str, step)],
-                               creationflags=NO_WINDOW)
+                               capture_output=True, text=True, encoding="utf-8", creationflags=NO_WINDOW)
+            print((r.stdout + r.stderr).strip())
             if r.returncode:
                 return r.returncode
         print(f"Open it on the iPhone (AirDrop, or mail it to yourself): {signed}")

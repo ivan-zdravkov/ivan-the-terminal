@@ -16,12 +16,10 @@ RING_APP_NAME, HEALTH_TYPES (Find Health Samples picker labels, comma-separated)
 The GitHub token is NOT in the file: the iPhone asks for it once, on import. The signing service sees everything else.
 """
 import importlib.util
-import json
 import plistlib
 import re
 import subprocess
 import sys
-import urllib.request
 import uuid
 from pathlib import Path
 
@@ -245,14 +243,15 @@ def repo_slug(repo):
 
 
 def sign(xml_path, out_path):
-    """HubSign takes {shortcutName, shortcut: <XML plist>} and returns the signed file (what Cherri does off macOS)."""
-    payload = json.dumps({"shortcutName": NAME, "shortcut": Path(xml_path).read_text(encoding="utf-8")}).encode()
-    req = urllib.request.Request(HUBSIGN, data=payload, method="POST",
-                                 headers={"Content-Type": "application/json", "User-Agent": "daily-coach"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        signed = r.read()
-    if not signed.startswith(b"AEA1"):  # Apple Encrypted Archive: what a signed .shortcut is
-        raise ValueError(f"the signing service returned no shortcut: {signed[:200]!r}")
+    """HubSign's form (multipart: shortcutName, shortcut = the XML plist file) returns the signed file. Sent with curl
+    (Windows 10+ and Linux ship it): the service redirects Python's own HTTP client to its home page, answers a JSON
+    post (what Cherri sends) with the form, and fails on a name with a space. iOS names the import after the file."""
+    r = subprocess.run(["curl", "-sS", "--max-time", "120", "-o", "-", "-F", f"shortcutName={NAME.replace(' ', '')}",
+                        "-F", f"shortcut=@{Path(xml_path).as_posix()};type=application/xml", HUBSIGN],
+                       capture_output=True, creationflags=coach.NO_WINDOW)
+    signed = r.stdout
+    if r.returncode or not signed.startswith(b"AEA1"):  # Apple Encrypted Archive: what a signed .shortcut is
+        raise ValueError(f"the signing service returned no shortcut: {(r.stderr or signed)[:200]!r}")
     Path(out_path).write_bytes(signed)
     return len(signed)
 
