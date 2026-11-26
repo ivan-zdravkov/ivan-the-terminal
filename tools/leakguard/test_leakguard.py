@@ -18,6 +18,12 @@ import leakguard  # noqa: E402
 J = "".join
 
 
+def make_iban(cc, bban):
+    """A checksum-valid IBAN for a made-up account, so no real or published IBAN sits in the repo."""
+    n = int(J(str(int(c, 36)) for c in bban + cc + "00"))
+    return f"{cc}{98 - n % 97:02d}{bban}"
+
+
 def rules_hit(text, **env):
     with mock.patch.dict(os.environ, {"LEAKGUARD_DENYLIST": "/nonexistent", **env}, clear=False), \
             redirect_stderr(io.StringIO()):
@@ -66,6 +72,16 @@ class GenericRules(unittest.TestCase):
     def test_iban_checksum(self):
         self.assertIn("iban", rules_hit(J(["GB82", " WEST 1234 5698 7654 32"])))
         self.assertNotIn("iban", rules_hit(J(["GB00", " WEST 1234 5698 7654 32"])))
+        # The pattern allows dot separators; the checksum must strip them too (it used to crash the hook)
+        gb = make_iban("GB", "ABCD10203040506070")
+        self.assertIn("iban", rules_hit(".".join(gb[i:i + 4] for i in range(0, len(gb), 4))))
+        self.assertNotIn("iban", rules_hit(".".join(("GB00" + gb[4:])[i:i + 4] for i in range(0, len(gb), 4))))
+        # A short word or extension right after the IBAN is swallowed by the greedy pattern; still caught
+        es = make_iban("ES", "90807060504030201000")
+        for tail in (".txt", ".csv", " to", "-ab"):
+            self.assertIn("iban", rules_hit(es + tail), tail)
+            self.assertIn("iban", rules_hit(" ".join(es[i:i + 4] for i in range(0, 24, 4)) + tail), tail)
+        self.assertNotIn("iban", rules_hit("ES00" + es[4:] + ".txt"))
 
     def test_bank_details(self):
         self.assertIn("payment-card", rules_hit(J(["4111 ", "1111 1111 1111"])))
