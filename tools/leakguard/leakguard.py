@@ -100,10 +100,25 @@ def _account_ok(m):
     return sum(c.isdigit() for c in m.group(0)) < 6
 
 
+# IBAN length per country (SWIFT IBAN registry): the greedy pattern can swallow a following short word or
+# extension (an ES IBAN then ".txt"), so the country's own length is checked as well as the whole match.
+IBAN_LEN = dict(re.findall(r"([A-Z]{2})(\d\d)", (
+    "AD24AE23AL28AT20AZ28BA20BE16BG22BH22BI27BR29BY28CH21CR22CY28CZ24DE22DJ27DK18DO28EE20EG29ES24FI18FK18FO18"
+    "FR27GB22GE22GI23GL18GR27GT28HN28HR21HU28IE22IL23IQ23IS26IT27JO30KW30KZ20LB28LC32LI21LT20LU20LV21LY25MC27"
+    "MD24ME22MK19MN20MR27MT31MU30NI28NL18NO15OM23PK24PL28PS29PT25QA29RO24RS22RU33SA24SC31SD18SE24SI19SK24SM27"
+    "SO23ST25SV28TL23TN24TR26UA29VA22VG24XK20YE30")))
+
+
 def _iban_ok(m):
-    s = re.sub(r"[ -]", "", m.group(0)).upper()
-    s = s[4:] + s[:4]
-    return int("".join(str(int(c, 36)) for c in s)) % 97 != 1
+    s = re.sub(r"[ .-]", "", m.group(0)).upper()  # the same separators the pattern allows
+    if not re.fullmatch(r"[A-Z0-9]+", s):
+        return False  # unexpected characters: report rather than guess
+    for n in {len(s), int(IBAN_LEN.get(s[:2], len(s)))}:
+        if n <= len(s):
+            t = s[4:n] + s[:4]
+            if int("".join(str(int(c, 36)) for c in t)) % 97 == 1:
+                return False
+    return True
 
 
 RULES = [  # (id, pattern, is_false_positive)
