@@ -60,6 +60,18 @@ Made for Xbox-style pads (XInput), which is also what Moonlight's virtual pad is
 
 Eden binds a pad by its SDL GUID, and your physical pad and Moonlight's virtual Xbox 360 pad have different ones. So Switch games in Apollo run `emulators pad stream` before the stream and `emulators pad desk` after it. `itt run emulators pads` lists connected pads with the GUID Eden sees; set `SWITCH_PAD` so the desk pad is known even when it's switched off.
 
+### Portable Eden builds
+
+Some Switch games come as their own Eden-based emulator bundle with a portable `user\` folder next to the exe instead of `%APPDATA%\eden`. `pad` can point at one: close it, run `itt run emulators pad desk --user "C:\Games\Game\user"` once (binds player 1 and the handheld slot to the desk pad, keeps everything else), then give its Apollo entry the switch through add-game `--batch`:
+
+```json
+[{"launcher": "C:\\Games\\Game\\game.exe", "name": "Game",
+  "prep": [{"do": "\"<python.exe>\" -I \"<emulators.py>\" pad stream --user \"C:\\Games\\Game\\user\"",
+            "undo": "\"<python.exe>\" -I \"<emulators.py>\" pad desk --user \"C:\\Games\\Game\\user\""}]}]
+```
+
+`SWITCH_HANDHELD` games are left alone there: they belong to the main Eden install.
+
 ## Games in Steam and Apollo
 
 ```text
