@@ -4,6 +4,7 @@ import os
 import struct
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
@@ -164,6 +165,18 @@ class Controllers(unittest.TestCase):
             game = (p.eden_user / "config" / "custom" / "010003F003A34000.ini").read_text(encoding="utf-8")
             self.assertIn(f"guid:{guid}", game)
             self.assertFalse(emulators.eden_bind_pad(p, guid, {"SWITCH_HANDHELD": "010003F003A34000"}))
+
+    def test_pad_user_binds_a_portable_build_only(self):
+        with tempfile.TemporaryDirectory() as t:
+            user = Path(t) / "Game" / "user"
+            (user / "config").mkdir(parents=True)
+            (user / "config" / "qt-config.ini").write_text("[Controls]\nplayer_0_button_a=keyboard\n", encoding="utf-8")
+            conf = {"EMULATION_ROOT": t, "EMU_DIR": t, "SWITCH_PAD": "3" * 32, "SWITCH_HANDHELD": "010003F003A34000"}
+            emulators.cmd_pad(types.SimpleNamespace(which="desk", user=str(user)), conf)
+            self.assertIn(f"guid:{'3' * 32},button:1", (user / "config" / "qt-config.ini").read_text(encoding="utf-8"))
+            self.assertFalse((user / "config" / "custom").exists())  # handheld games belong to Eden itself
+            with self.assertRaises(SystemExit):
+                emulators.cmd_pad(types.SimpleNamespace(which="desk", user=str(Path(t) / "missing")), conf)
 
     def test_rebind_rules(self):
         desk, other = "1" * 32, "2" * 32

@@ -21,7 +21,7 @@ Config: `~/.config/ivan-the-terminal/emulators.conf` (template: `config.example`
    `itt run emulators games --dry-run` (check every `note art:` names the right game), then without `--dry-run`.
    One Steam restart and one UAC prompt for the whole batch; ask first if Ivan might be playing or streaming.
 5. `itt run emulators status` shows versions and save links; `itt run emulators command "<rom>"` prints a launch line.
-6. Controllers (setup does this; the pad must be connected or `SWITCH_PAD` set): Xenia reads XInput as is; RPCS3 player 1 = `XInput Pad #1`; Eden player 1 = Pro Controller bound to the pad's SDL GUID, by button position (Xbox A/bottom acts as Switch B). Eden binds by GUID, so Switch games in Apollo run `pad stream` before and `pad desk` after a stream. `itt run emulators pads` lists connected pads and GUIDs; `pad desk|stream|<guid>` switches by hand.
+6. Controllers (setup does this; the pad must be connected or `SWITCH_PAD` set): Xenia reads XInput as is; RPCS3 player 1 = `XInput Pad #1`; Eden player 1 = Pro Controller bound to the pad's SDL GUID, by button position (Xbox A/bottom acts as Switch B). Eden binds by GUID, so Switch games in Apollo run `pad stream` before and `pad desk` after a stream. `itt run emulators pads` lists connected pads and GUIDs; `pad desk|stream|<guid>` switches by hand. A portable Eden-based build (its own `user\` folder next to the exe, e.g. a per-game bundle) takes `--user "<folder>\user"`: run `pad desk --user …` once with it closed, then add it with add-game `--batch` and the same `pad stream/desk --user …` prep (README: "Portable Eden builds").
 
 For the folder layout, what each setting does and why, read `README.md`.
 

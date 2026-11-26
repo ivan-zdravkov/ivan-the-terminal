@@ -8,7 +8,8 @@ emulation folder: ROMs, BIOS/keys/firmware, mods, patches and saves stay there; 
   emulators.py games   [names|systems] [--dry-run]   GAME= entries -> Steam + Apollo (via add-game, one batch)
   emulators.py command <rom>                the emulator command line for a ROM (system from its folder)
   emulators.py pads                         connected XInput pads and the SDL GUIDs Eden binds to
-  emulators.py pad desk|stream|<guid>       Eden player 1 -> physical pad / Moonlight's virtual pad (Apollo prep)
+  emulators.py pad desk|stream|<guid> [--user DIR]   Eden player 1 -> physical pad / Moonlight's virtual pad (Apollo
+                                            prep); --user: a portable Eden-based build's user folder instead
 
 Config: ~/.config/ivan-the-terminal/emulators.conf (template: config.example). Problems-only output + one summary.
 """
@@ -592,14 +593,20 @@ def cmd_pads(args, conf):
 
 
 def cmd_pad(args, conf):
-    """Point Eden's player 1 at the desk pad, Moonlight's virtual pad (Apollo prep-cmd), or a given GUID."""
+    """Point Eden's player 1 at the desk pad, Moonlight's virtual pad (Apollo prep-cmd), or a given GUID.
+    --user points at a portable Eden-based build (its own user/ folder); SWITCH_HANDHELD games stay with Eden."""
     p = Paths(conf)
+    if args.user:
+        p.eden_user = Path(os.path.expanduser(args.user))
+        if not (p.eden_user / "config" / "qt-config.ini").is_file():
+            die(f"{p.eden_user}: no config/qt-config.ini - run that build once first")
+        conf = {k: v for k, v in conf.items() if k != "SWITCH_HANDHELD"}
     guid = {"desk": desk_pad(conf), "stream": conf.get("SWITCH_PAD_STREAM") or VIRTUAL_X360}.get(args.which,
                                                                                                args.which)
     if not guid or not re.fullmatch(r"[0-9a-f]{32}", guid):
         die(f"no pad for '{args.which}': connect it, or set SWITCH_PAD to its GUID (see `pads`)")
     changed = eden_bind_pad(p, guid, conf)
-    print(f"pad: Eden player 1 -> {args.which} {guid}{'' if changed else ' (already)'}")
+    print(f"pad: {p.eden_user} player 1 -> {args.which} {guid}{'' if changed else ' (already)'}")
 
 
 def set_yaml(text, want):
@@ -907,6 +914,7 @@ def main(argv):
     sub.add_parser("pads")
     pd = sub.add_parser("pad")
     pd.add_argument("which", help="desk | stream | <SDL GUID>")
+    pd.add_argument("--user", help="user folder of a portable Eden-based build (default: Eden's own, under %%APPDATA%%)")
     args = ap.parse_args(argv)
     unknown = [e for e in getattr(args, "emulators", []) if e not in EMULATORS]
     if unknown:
