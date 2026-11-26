@@ -16,6 +16,7 @@ Never publish bank details (IBAN, card or account numbers, BIC with an account) 
 - Check the available skills first and use a matching one instead of improvising. If a repeatable task has no skill, say so and offer to write one.
 - End substantial tasks, and casual sessions, with a short **kaizen** pass: improve the public or private skills, docs and tools you touched, and log bigger ideas to the private backlog.
 - What you learn about Ivan or the setup goes to the overlay (memory/profile), never into this repo.
+- Ship as you go: each finished task ends committed (public via ship-public, one PR per topic; overlay committed and pushed). The SessionStart hook (`tools/pending_work.py`) lists what an earlier session left unshipped; finish that first.
 
 ## Publishing (mandatory)
 Pushing a branch publishes it. Use the **ship-public** skill for every commit, push, PR, issue or release: branch → `itt ship-check` → `/security-review` → push → PR → auto-merge on green.
