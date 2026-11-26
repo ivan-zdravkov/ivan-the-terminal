@@ -9,7 +9,8 @@ Replaces: the stock YouTube app's ads, Play Store-gated updates and the ad-fille
 Config: `~/.config/ivan-the-terminal/tv.conf` (template: `config.example`). The TV needs Network debugging on (Developer options).
 
 - `itt run tv status` shows outdated or missing apps and settings drift (problems only; `-v` shows all).
-- `itt run tv update [app...]` installs missing apps and updates outdated ones (`--dry-run` to preview). Checksums are verified when the source publishes them (SmartTube, Tailscale).
+- `itt run tv update [app...]` installs missing apps and updates outdated ones (`--dry-run` to preview). Checksums are verified when the source publishes them (SmartTube, Tailscale, Kodi).
+- Kodi (`kodi` in `APPS`) plays local files from a USB drive with real artwork. Vendor media players often ignore embedded covers (MKV and MP4) and thumbnail a frame from each video instead. Kodi setup notes: `references/apps.md`.
 - `itt run tv setup` (idempotent) gives the boot helper its permissions, makes Tailscale the always-on VPN, and keeps the `DISABLE` stock apps disabled (stock YouTube, so links open in SmartTube; undo with `adb shell pm enable <pkg>`).
 - Remote app buttons (`REMAP=keymapper`): Key Mapper's key maps send them where Ivan wants (e.g. YouTube → SmartTube, Netflix/Disney+/Prime → Stremio). The firmware launches these buttons before accessibility services see them, so only Expert Mode works: a shell-user bridge that grabs the IR remote.
   It dies on every reboot. `setup` starts it, and `tv-bridge.timer` (every 3 min, silent while the TV is off) restarts it from the PC. Recording and the key maps themselves are done in the app; see `references/apps.md`.
