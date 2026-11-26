@@ -49,6 +49,17 @@ class Sources(unittest.TestCase):
         with mock.patch.object(tvctl, "http", return_value=rel):
             self.assertEqual(tvctl.keymapper(["armeabi-v7a"]), ("4.6.2", "foss", "bb"))
 
+    def test_kodi_newest_stable_on_mirror_with_sha(self):
+        listing = ('<a href="kodi-21.2-Omega-armeabi-v7a.apk"> <a href="kodi-21.10-Omega-armeabi-v7a.apk"> '
+                   '<a href="kodi-22.0-Piers_rc1-armeabi-v7a.apk"> <a href="kodi-21.3-Omega-arm64-v8a.apk">')
+        base = "https://mirrors.kodi.tv/releases/android/arm/"
+        replies = {base: listing, base + "kodi-21.10-Omega-armeabi-v7a.apk?sha256": "cc  kodi-21.10-Omega-armeabi-v7a.apk\n"}
+        with mock.patch.object(tvctl, "http", side_effect=lambda u: replies.get(u, "")):
+            self.assertEqual(tvctl.kodi(["armeabi-v7a", "armeabi"]),
+                             ("21.10", base + "kodi-21.10-Omega-armeabi-v7a.apk", "cc"))
+            with self.assertRaises(LookupError):
+                tvctl.kodi(["x86"])
+
 
 class FakeTV:
     def __init__(self, replies):

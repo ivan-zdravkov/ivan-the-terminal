@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -89,12 +90,36 @@ def keymapper(abis):
     raise LookupError(f"no Key Mapper FOSS asset in {rel['tag_name']}")
 
 
+KODI_DIRS = {"arm64-v8a": "arm64-v8a", "armeabi-v7a": "arm"}  # ABI -> mirrors.kodi.tv/releases/android/<dir>/
+
+
+def kodi_listing_latest(html, abi):
+    # Stable names are kodi-<ver>-<Codename>-<abi>.apk; betas/RCs carry "_rc1" etc. and don't match.
+    found = re.findall(rf"kodi-(\d+(?:\.\d+)+)-[A-Za-z]+-{re.escape(abi)}\.apk", html)
+    if not found:
+        return None
+    best = max(found, key=vtuple)
+    return best, re.search(rf"kodi-{re.escape(best)}-[A-Za-z]+-{re.escape(abi)}\.apk", html).group()
+
+
+def kodi(abis):
+    for abi in abis:
+        if abi in KODI_DIRS:
+            base = f"https://mirrors.kodi.tv/releases/android/{KODI_DIRS[abi]}/"
+            hit = kodi_listing_latest(http(base), abi)
+            if hit:
+                url = base + hit[1]
+                return hit[0], url, http(url + "?sha256").split()[0]
+    raise LookupError(f"no stable Kodi build for {abis} on mirrors.kodi.tv")
+
+
 APPS = {
     "stremio": ("com.stremio.one", stremio),
     "stremio-boot": ("com.stremio.tv.launcher", stremio_boot),
     "smarttube": ("org.smarttube.stable", smarttube),
     "tailscale": ("com.tailscale.ipn", tailscale),
     "keymapper": ("io.github.sds100.keymapper", keymapper),
+    "kodi": ("org.xbmc.kodi", kodi),
 }
 VPN_PKGS = {"tailscale": "com.tailscale.ipn"}
 BOOT_HELPERS = {"stremio": ("com.stremio.tv.launcher", "com.stremio.tv.launcher/.MainActivity")}
@@ -182,14 +207,21 @@ def plan(tv, names):
     return rows
 
 
-def fetch(url, sha):
+def fetch(url, sha, tries=3):
     CACHE.mkdir(parents=True, exist_ok=True)
     dest = CACHE / url.rsplit("/", 1)[1]
-    h = hashlib.sha256()
-    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=600) as r, open(dest, "wb") as f:
-        while chunk := r.read(1 << 20):
-            h.update(chunk)
-            f.write(chunk)
+    for attempt in range(tries):
+        h = hashlib.sha256()
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=600) as r, open(dest, "wb") as f:
+                while chunk := r.read(1 << 20):
+                    h.update(chunk)
+                    f.write(chunk)
+            break
+        except urllib.error.URLError:
+            # Redirectors (mirrors.kodi.tv) pick a random mirror per request; some have broken TLS chains.
+            if attempt == tries - 1:
+                raise
     if sha and h.hexdigest() != sha.lower():
         dest.unlink()
         raise ValueError(f"sha256 mismatch for {url}")

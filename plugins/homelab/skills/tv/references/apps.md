@@ -7,6 +7,13 @@
 | smarttube | `org.smarttube.stable` | GitHub `yuliskov/SmartTube` latest non-prerelease, `SmartTube_stable_<ver>_<abi>.apk` | sha256 from the release asset digest |
 | tailscale | `com.tailscale.ipn` | pkgs.tailscale.com/stable (`?mode=json` → universal APK) | sha256 from `<apk>.sha256` |
 | keymapper | `io.github.sds100.keymapper` | GitHub `keymapperorg/KeyMapper` latest release, `keymapper-<ver>-foss.apk` (GPL, no Play services) | sha256 from the release asset digest |
+| kodi | `org.xbmc.kodi` | newest stable `kodi-<ver>-<Codename>-<abi>.apk` on mirrors.kodi.tv/releases/android/{arm,arm64-v8a}/ | sha256 from `<apk>?sha256`; the redirector picks a random mirror, so downloads retry |
+
+## Kodi for local files (USB drive)
+- First start asks for storage and microphone. Grant storage with `pm grant org.xbmc.kodi android.permission.READ_EXTERNAL_STORAGE` and "All files access" with `appops set --uid org.xbmc.kodi MANAGE_EXTERNAL_STORAGE allow`; without the latter Kodi can't read `.nfo`/`.jpg` next to the videos. Decline the microphone.
+- A USB volume mounts at `/storage/<volume-uuid>/` (`adb shell ls /storage`). With the "Local information only" scraper (`metadata.local`) Kodi skips every file without a `<name>.nfo`; a minimal `<movie><title/><year/></movie>` is enough. Local art: `<name>-fanart.jpg`, `<name>-poster.jpg`.
+- Kodi reads local art only when it first adds an item. To pick up new art, remove the movies from the library (or `MyVideos*.db` with Kodi stopped) and rescan.
+- Data lives in `/sdcard/Android/data/org.xbmc.kodi/files/.kodi/userdata/` (adb can read and write it; stop Kodi first with `am force-stop`). From Git Bash set `MSYS_NO_PATHCONV=1`, or `/sdcard/...` turns into a Windows path.
 
 ## Why these
 - **SmartTube** is the community-standard ad-free YouTube client for Android TV: it blocks ads and SponsorBlock segments, plays up to 8K, and needs no root. It is open source and not on any app store. Copies on APK sites are fakes.
